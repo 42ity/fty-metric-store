@@ -78,6 +78,9 @@ class MultiRowCache {
         long _first_ms = get_clock_ms();
 };
 
+void
+    multi_row_test (bool verbose);
+
 #endif // #define SRC_PERSIST_
 
 
