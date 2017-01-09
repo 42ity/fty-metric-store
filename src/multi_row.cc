@@ -104,3 +104,8 @@ long
 }       
     
 
+void
+    multi_row_test (bool verbose)
+{
+    puts (" * multi_row_test: NOT IMPLEMENTED!");
+}

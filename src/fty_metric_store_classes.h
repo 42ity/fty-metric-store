@@ -67,6 +67,10 @@ FTY_METRIC_STORE_PRIVATE void
 FTY_METRIC_STORE_PRIVATE void
     multi_row_test (bool verbose);
 
+//  Self test for private classes
+FTY_METRIC_STORE_PRIVATE void
+    fty_metric_store_private_selftest (bool verbose);
+
 #endif // FTY_METRIC_STORE_BUILD_DRAFT_API
 
 #endif
