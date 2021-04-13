@@ -32,19 +32,15 @@ extern "C" {
  *  \brief Take string encoded double value and if possible
  *          return representation: integer x 10^scale
  */
-FTY_METRIC_STORE_EXPORT bool
-    stobiosf (const std::string& string, int32_t& integer, int8_t& scale);
+bool stobiosf (const std::string& string, int32_t& integer, int8_t& scale);
 
-FTY_METRIC_STORE_EXPORT int64_t
-    string_to_int64 (const char *value);
+int64_t string_to_int64 (const char *value);
 
-FTY_METRIC_STORE_EXPORT bool
-    stobiosf_wrapper (const std::string& string, int32_t& integer, int8_t& scale);
+bool stobiosf_wrapper (const std::string& string, int32_t& integer, int8_t& scale);
 
 //  Self test of this class
 //  Note: Keep this definition in sync with fty_metric_store_classes.h
-FTY_METRIC_STORE_PRIVATE void
-    converter_test (bool verbose);
+void converter_test (bool verbose);
 
 //  @end
 

@@ -45,7 +45,6 @@ typedef uint16_t  m_msrmnt_tpc_id_t;
 // ----- column: id_discovered_device -----------------
 typedef uint16_t m_dvc_id_t;
 
-FTY_METRIC_STORE_EXPORT
 int
     insert_into_measurement(
         tntdb::Connection &conn,
@@ -56,7 +55,6 @@ int
         const char        *units,
         const char        *device_name);
 
-FTY_METRIC_STORE_EXPORT
 int
     select_measurements (
         const std::string &connurl,
@@ -67,7 +65,6 @@ int
                         const tntdb::Row&)>& cb,
         bool is_ordered);
 
-FTY_METRIC_STORE_EXPORT
 int
     select_topic (
         const std::string &connurl,
@@ -75,7 +72,6 @@ int
         std::function<void(
                         const tntdb::Row&)>& cb);
 
-FTY_METRIC_STORE_EXPORT
 int
     delete_measurements(
         tntdb::Connection &conn,
@@ -83,15 +79,12 @@ int
 
 //  Self test of this class
 //  Note: Keep this definition in sync with fty_metric_store_classes.h
-FTY_METRIC_STORE_PRIVATE
 void
     persistance_test (bool verbose);
 
-FTY_METRIC_STORE_EXPORT
 void
     flush_measurement_when_needed(std::string &url);
 
-FTY_METRIC_STORE_EXPORT
 void
     flush_measurement(std::string &url);
 //  @end

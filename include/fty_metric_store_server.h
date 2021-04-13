@@ -27,12 +27,10 @@ extern "C" {
 #endif
 
 //  Metric store actor
-FTY_METRIC_STORE_EXPORT void
-    fty_metric_store_server (zsock_t *pipe, void* args);
+void fty_metric_store_server (zsock_t *pipe, void* args);
 
 //  Self test of this class
-FTY_METRIC_STORE_EXPORT void
-    fty_metric_store_server_test (bool verbose);
+void fty_metric_store_server_test (bool verbose);
 
 //  @end
 
