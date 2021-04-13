@@ -234,7 +234,7 @@ int main(int argc, char** argv) {
     }
     if (help) { usage(); exit(1); }
 
-    ManageFtyLog::setInstanceFtylog("dbstore_bench", LOG_CONFIG);
+    ManageFtyLog::setInstanceFtylog("dbstore_bench", FTY_COMMON_LOGGING_DEFAULT_CFG);
     log_debug("## bench started ##");
 
     bench(delay,element, topic,  periodic, minute, insert_every);

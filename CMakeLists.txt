@@ -16,7 +16,7 @@ etn_target(exe ${PROJECT_NAME}
         src/converter.cc
         src/multi_row.cc
         src/persistance.cc
-        src/dbstore_bench.cc
+        #src/dbstore_bench.cc
         src/fty_metric_store.cc
         src/fty_metric_store_server.cc
     INCLUDE_DIRS
@@ -60,7 +60,6 @@ if (BUILD_TESTING)
             src/converter.cc
             src/multi_row.cc
             src/persistance.cc
-            src/dbstore_bench.cc
             src/fty_metric_store_server.cc
             src/fty_metric_store_private_selftest.cc
         INCLUDE_DIRS
