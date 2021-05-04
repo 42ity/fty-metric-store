@@ -7,10 +7,11 @@ Agent fty-metric-store stores metrics to DB and provides an interface to request
 To build fty-metric-store project run:
 
 ```bash
-./autogen.sh
-./configure
+mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=usr -DBUILD_TESTING=On ..
 make
 make check # to run self-test
+sudo make install
 ```
 
 ## How to run

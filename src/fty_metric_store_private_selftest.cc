@@ -46,6 +46,8 @@ fty_metric_store_private_selftest (bool verbose, const char *subtest)
         persistance_test (verbose);
     if (streq (subtest, "$ALL") || streq (subtest, "multi_row_test"))
         multi_row_test (verbose);
+    if (streq (subtest, "$ALL") || streq (subtest, "server_test"))
+        fty_metric_store_server_test (verbose);
 }
 /*
 ################################################################################

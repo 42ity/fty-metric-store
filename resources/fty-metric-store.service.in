@@ -1,0 +1,24 @@
+[Unit]
+Description=42Ity persistance for metrics
+Requires=malamute.service fty-db.target
+After=malamute.service fty-db.target
+PartOf=bios.target
+
+[Service]
+Type=simple
+User=@MS_USER@
+EnvironmentFile=-/usr/share/bios/etc/default/bios
+EnvironmentFile=-/usr/share/bios/etc/default/bios__%n.conf
+EnvironmentFile=-/usr/share/bios/etc/default/fty
+EnvironmentFile=-/usr/share/bios/etc/default/fty__%n.conf
+EnvironmentFile=-/etc/default/bios
+EnvironmentFile=-/etc/default/bios__%n.conf
+EnvironmentFile=-/etc/default/fty
+EnvironmentFile=-/etc/default/fty__%n.conf
+Environment="prefix=/usr"
+EnvironmentFile=/etc/default/bios-db-rw
+ExecStart=@CMAKE_INSTALL_FULL_BINDIR@/@PROJECT_NAME@ @MS_CONF_FILE@
+Restart=always
+
+[Install]
+WantedBy=bios.target

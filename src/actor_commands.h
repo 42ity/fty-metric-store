@@ -50,15 +50,13 @@ extern "C" {
 // Performs the actor commands logic
 // Destroys the message
 // Returns 1 for $TERM (means exit), 0 otherwise
-FTY_METRIC_STORE_EXPORT int
-    actor_commands (
+int actor_commands (
             mlm_client_t *client,
             zmsg_t **message_p);
 
 //  Self test of this class
 //  Note: Keep this definition in sync with fty_metric_store_classes.h
-FTY_METRIC_STORE_PRIVATE void
-    actor_commands_test (bool verbose);
+void actor_commands_test (bool verbose);
 
 //  @end
 

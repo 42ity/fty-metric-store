@@ -79,7 +79,6 @@ class MultiRowCache {
 
 //  Self test of this class
 //  Note: Keep this definition in sync with fty_metric_store_classes.h
-FTY_METRIC_STORE_PRIVATE void
-    multi_row_test (bool verbose);
+void multi_row_test (bool verbose);
 
 #endif // #define SRC_PERSIST_

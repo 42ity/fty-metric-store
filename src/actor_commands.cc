@@ -175,8 +175,8 @@ actor_commands_test (bool verbose)
     // src/selftest-ro; if your test creates filesystem objects, please
     // do so under src/selftest-rw. They are defined below along with a
     // usecase (asert) to make compilers happy.
-    const char *SELFTEST_DIR_RO = "src/selftest-ro";
-    const char *SELFTEST_DIR_RW = "src/selftest-rw";
+    const char *SELFTEST_DIR_RO = "selftest-ro";
+    const char *SELFTEST_DIR_RW = "selftest-rw";
     assert (SELFTEST_DIR_RO);
     assert (SELFTEST_DIR_RW);
     std::string str_SELFTEST_DIR_RO = std::string(SELFTEST_DIR_RO);
