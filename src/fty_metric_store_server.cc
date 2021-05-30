@@ -58,6 +58,7 @@
 #include <malamute.h>
 #include <mutex>
 #include <tntdb.h>
+#include <stdexcept>
 
 static std::mutex g_row_mutex;
 

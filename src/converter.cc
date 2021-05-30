@@ -30,7 +30,7 @@
 #include <cmath>
 #include <fty_log.h>
 #include <inttypes.h>
-
+#include <stdexcept>
 
 bool stobiosf(const std::string& string, int32_t& integer, int8_t& scale)
 {
