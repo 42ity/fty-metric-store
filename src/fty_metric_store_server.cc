@@ -72,7 +72,7 @@ static std::string url = std::string("mysql:db=box_utf8;user=") +
                          ((getenv("DB_USER") == nullptr) ? "root" : getenv("DB_USER")) +
                          ((getenv("DB_PASSWD") == nullptr) ? "" : std::string(";password=") + getenv("DB_PASSWD"));
 
-static zmsg_t* s_process_mailbox_aggregate(mlm_client_t* client, zmsg_t** message_p)
+static zmsg_t* s_process_mailbox_aggregate([[maybe_unused]] mlm_client_t* client, zmsg_t** message_p)
 {
     assert(client);
     assert(message_p && *message_p);
@@ -392,7 +392,7 @@ static void s_process_stream_proto_asset(fty_proto_t* m)
     }
 }
 
-static void s_handle_stream(mlm_client_t* client, zmsg_t** message_p)
+static void s_handle_stream([[maybe_unused]] mlm_client_t* client, zmsg_t** message_p)
 {
     assert(client); // notUsed
     assert(message_p && *message_p);

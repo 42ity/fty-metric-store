@@ -97,7 +97,7 @@ int main(int argc, char* argv[])
         const char* dfl = DEFAULTS[i];
 
         char* var_name = nullptr;
-        int   r        = asprintf(&var_name, "%s_%s", FTY_METRIC_STORE_CONF_PREFIX, STEPS[i]);
+        [[maybe_unused]] int   r        = asprintf(&var_name, "%s_%s", FTY_METRIC_STORE_CONF_PREFIX, STEPS[i]);
         assert(r != -1);
         if (var_name && getenv(var_name)) {
             dfl = getenv(var_name);
