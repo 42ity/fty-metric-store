@@ -21,13 +21,11 @@ with this program; if not, write to the Free Software Foundation, Inc.,
     \brief  manage multi rows insertion cache
     \author GeraldGuillaume <GeraldGuillaume@Eaton.com>
  */
-#ifndef SRC_PERSIST_MULTI_ROW_H
-#define SRC_PERSIST_MULTI_ROW_H
+#pragma once
 
+#include "persistance.h"
 #include <list>
 #include <string>
-
-#include "fty_metric_store_classes.h"
 
 #define MAX_ROW_DEFAULT   1000
 #define MAX_DELAY_DEFAULT 1
@@ -35,50 +33,49 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #define EV_DBSTORE_MAX_ROW   "BIOS_DBSTORE_MAX_ROW"
 #define EV_DBSTORE_MAX_DELAY "BIOS_DBSTORE_MAX_DELAY"
 
-using namespace std;
+class MultiRowCache
+{
+public:
+    MultiRowCache();
+    MultiRowCache(const uint32_t max_row, const uint32_t max_delay_s)
+    {
+        _max_row     = max_row;
+        _max_delay_s = max_delay_s;
+    }
 
-class MultiRowCache {
-    public:
-        MultiRowCache ();
-        MultiRowCache (const uint32_t max_row, const uint32_t max_delay_s)
-        {
-            _max_row = max_row;
-            _max_delay_s = max_delay_s;
-        }
+    void push_back(int64_t time, m_msrmnt_value_t value, m_msrmnt_scale_t scale, m_msrmnt_tpc_id_t topic_id);
 
-        void push_back(
-            int64_t time,
-            m_msrmnt_value_t value,
-            m_msrmnt_scale_t scale,
-            m_msrmnt_tpc_id_t topic_id);
+    /// check one of those conditions :
+    ///  number of values > _max_row
+    /// or delay between first value and now > _max_delay_s
+    bool is_ready_for_insert();
 
-        /*
-         * \brief check one of those conditions :
-         *  number of values > _max_row
-         * or delay between first value and now > _max_delay_s
-         */
-        bool is_ready_for_insert();
+    std::string get_insert_query();
 
-        string get_insert_query();
+    void clear()
+    {
+        _row_cache.clear();
+        reset_clock();
+    }
+    void reset_clock()
+    {
+        _first_ms = get_clock_ms();
+    }
 
-        void clear() { _row_cache.clear(); reset_clock(); }
-        void reset_clock() { _first_ms = get_clock_ms(); }
+    uint32_t get_max_row()
+    {
+        return _max_row;
+    }
+    uint32_t get_max_delay()
+    {
+        return _max_delay_s;
+    }
 
-        int get_max_row() { return _max_row; }
-        int get_max_delay() { return _max_delay_s; }
+private:
+    std::list<std::string> _row_cache;
+    uint32_t               _max_delay_s;
+    uint32_t               _max_row;
 
-
-    private:
-        list<string> _row_cache;
-        uint32_t _max_delay_s;
-        uint32_t _max_row;
-
-        long get_clock_ms();
-        long _first_ms = get_clock_ms();
+    long get_clock_ms();
+    long _first_ms = get_clock_ms();
 };
-
-//  Self test of this class
-//  Note: Keep this definition in sync with fty_metric_store_classes.h
-void multi_row_test (bool verbose);
-
-#endif // #define SRC_PERSIST_

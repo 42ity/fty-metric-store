@@ -20,32 +20,13 @@
     =========================================================================
 */
 
-#ifndef CONVERTER_H_INCLUDED
-#define CONVERTER_H_INCLUDED
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
+#pragma once
+#include <string>
 
 /**
  *  \brief Take string encoded double value and if possible
  *          return representation: integer x 10^scale
  */
-bool stobiosf (const std::string& string, int32_t& integer, int8_t& scale);
-
-int64_t string_to_int64 (const char *value);
-
-bool stobiosf_wrapper (const std::string& string, int32_t& integer, int8_t& scale);
-
-//  Self test of this class
-//  Note: Keep this definition in sync with fty_metric_store_classes.h
-void converter_test (bool verbose);
-
-//  @end
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif
+bool stobiosf(const std::string& string, int32_t& integer, int8_t& scale);
+int64_t string_to_int64(const char* value);
+bool stobiosf_wrapper(const std::string& string, int32_t& integer, int8_t& scale);
