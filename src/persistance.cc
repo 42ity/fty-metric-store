@@ -25,6 +25,7 @@
 #include "multi_row.h"
 #include <fty_log.h>
 #include <tntdb.h>
+#include <stdexcept>
 
 static MultiRowCache g_RowCache;
 
