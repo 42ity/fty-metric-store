@@ -25,6 +25,7 @@
 #include "fty_metric_store_server.h"
 #include <fty_log.h>
 #include <malamute.h>
+#include <stdexcept>
 
 int actor_commands(mlm_client_t* client, zmsg_t** message_p)
 {
