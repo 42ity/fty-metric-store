@@ -1,5 +1,5 @@
 /*  =========================================================================
-    fty-metric-store - Persistance for metrics
+    fty_metric_store_server - Metric store actor
 
     Copyright (C) 2014 - 2020 Eaton
 
@@ -19,13 +19,12 @@
     =========================================================================
 */
 
-#ifndef FTY_METRIC_STORE_H_H_INCLUDED
-#define FTY_METRIC_STORE_H_H_INCLUDED
+#pragma once
+#include <czmq.h>
 
-//  Include the project library file
-#include "fty_metric_store_library.h"
-
-//  Add your own public definitions here, if you need them
 #define FTY_METRIC_STORE_CONF_PREFIX "FTY_METRIC_STORE_AGE"
+#define POLL_INTERVAL                1000
+#define AVG_GRAPH                    "aggregated data"
 
-#endif
+//  Metric store actor
+void fty_metric_store_server(zsock_t* pipe, void* args);

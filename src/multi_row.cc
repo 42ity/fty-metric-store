@@ -26,46 +26,45 @@
 
 #include "multi_row.h"
 #include <ctime>
+#include <fty_log.h>
+#include <inttypes.h>
+#include <sys/time.h>
 
-MultiRowCache::MultiRowCache ()
+MultiRowCache::MultiRowCache()
 {
-    _max_row = MAX_ROW_DEFAULT;
+    _max_row     = MAX_ROW_DEFAULT;
     _max_delay_s = MAX_DELAY_DEFAULT;
 
-    char *env_max_row = getenv (EV_DBSTORE_MAX_ROW);
+    char* env_max_row = getenv(EV_DBSTORE_MAX_ROW);
     if (env_max_row) {
         int max_row = atoi(env_max_row);
-        if (max_row > 0) _max_row = (uint32_t)max_row;
-        log_info("use %s %d as max row insertion bulk limit",EV_DBSTORE_MAX_ROW,_max_row);
+        if (max_row > 0)
+            _max_row = uint32_t(max_row);
+        log_info("use %s %d as max row insertion bulk limit", EV_DBSTORE_MAX_ROW, _max_row);
     }
 
-    char *env_max_delay = getenv (EV_DBSTORE_MAX_DELAY);
+    char* env_max_delay = getenv(EV_DBSTORE_MAX_DELAY);
     if (env_max_delay) {
         int max_delay_s = atoi(env_max_delay);
-        if (max_delay_s > 0) _max_delay_s = (uint32_t)max_delay_s;
-        log_info("use %s %ds as max delay before multi row insertion",EV_DBSTORE_MAX_DELAY,_max_delay_s);
+        if (max_delay_s > 0)
+            _max_delay_s = uint32_t(max_delay_s);
+        log_info("use %s %ds as max delay before multi row insertion", EV_DBSTORE_MAX_DELAY, _max_delay_s);
     }
 }
 
-void
-MultiRowCache::push_back (
-    int64_t time,
-    m_msrmnt_value_t value,
-    m_msrmnt_scale_t scale,
-    m_msrmnt_tpc_id_t topic_id)
+void MultiRowCache::push_back(int64_t time, m_msrmnt_value_t value, m_msrmnt_scale_t scale, m_msrmnt_tpc_id_t topic_id)
 {
-    //multiple row insertion request
+    // multiple row insertion request
     char val[50];
-    snprintf(val,sizeof(val),"(%" PRIu64 ",%" PRIi32 ",%" PRIi16 ",%" PRIi16 ")",time,value,scale,topic_id );
+    snprintf(val, sizeof(val), "(%" PRIu64 ",%" PRIi32 ",%" PRIi16 ",%" PRIi16 ")", time, value, scale, topic_id);
     _row_cache.push_back(val);
-    //check if it is the first one => if yes, memory the timestamp
+    // check if it is the first one => if yes, memory the timestamp
     if (_row_cache.size() == 1) {
         _first_ms = get_clock_ms();
     }
 }
 
-bool
-MultiRowCache::is_ready_for_insert ()
+bool MultiRowCache::is_ready_for_insert()
 {
     if (_row_cache.size() == 0)
         return false;
@@ -75,26 +74,26 @@ MultiRowCache::is_ready_for_insert ()
         return true;
 
     // time to flush measurement ?
-    long now_ms = get_clock_ms();
+    long now_ms              = get_clock_ms();
     long elapsed_periodic_ms = now_ms - _first_ms;
-    if (elapsed_periodic_ms >= ((long)_max_delay_s * 1000))
+    if (elapsed_periodic_ms >= (long(_max_delay_s) * 1000))
         return true;
 
     return false;
-    //return (_row_cache.size()>=_max_row || elapsed_periodic_ms >= (long)_max_delay_s * 1000 );
+    // return (_row_cache.size()>=_max_row || elapsed_periodic_ms >= (long)_max_delay_s * 1000 );
 }
 
 // return INSERT query or empty string if no value in cache available
-string
-MultiRowCache::get_insert_query ()
+std::string MultiRowCache::get_insert_query()
 {
     if (_row_cache.size() == 0)
         return "";
 
-    string query = "INSERT INTO t_bios_measurement (timestamp, value, scale, topic_id) VALUES ";
-    for (list<string>::iterator value=_row_cache.begin(); value != _row_cache.end(); ){
+    std::string query = "INSERT INTO t_bios_measurement (timestamp, value, scale, topic_id) VALUES ";
+    for (std::list<std::string>::iterator value = _row_cache.begin(); value != _row_cache.end();) {
         query += *value;
-        if (++value != _row_cache.end()) query += ",";
+        if (++value != _row_cache.end())
+            query += ",";
     }
     query += " ON DUPLICATE KEY UPDATE value=VALUES(value),scale=VALUES(scale) ";
 
@@ -102,20 +101,9 @@ MultiRowCache::get_insert_query ()
     return query;
 }
 
-long
-MultiRowCache::get_clock_ms ()
+long MultiRowCache::get_clock_ms()
 {
     struct timeval time;
-    gettimeofday(&time, NULL); // Get Time
+    gettimeofday(&time, nullptr); // Get Time
     return (time.tv_sec * 1000) + (time.tv_usec / 1000);
 }
-
-//  --------------------------------------------------------------------------
-//  Self test of this class
-
-void
-multi_row_test (bool verbose)
-{
-    printf (" * multi_row: Empty test - OK.\n");
-}
-

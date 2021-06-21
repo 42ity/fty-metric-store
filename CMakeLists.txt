@@ -10,26 +10,54 @@ project(fty-metric-store
 find_package(fty-cmake PATHS ${CMAKE_BINARY_DIR}/fty-cmake)
 ##############################################################################################################
 
-etn_target(exe ${PROJECT_NAME}
+etn_target(static ${PROJECT_NAME}-lib
     SOURCES
         src/actor_commands.cc
+        src/actor_commands.h
         src/converter.cc
-        src/multi_row.cc
-        src/persistance.cc
+        src/converter.h
         #src/dbstore_bench.cc
-        src/fty_metric_store.cc
         src/fty_metric_store_server.cc
-    INCLUDE_DIRS
-        include
+        src/fty_metric_store_server.h
+        src/multi_row.cc
+        src/multi_row.h
+        src/persistance.cc
+        src/persistance.h
     USES_PRIVATE
+        mlm
         czmq
-        fty_common_logging
-        fty_proto
-        cxxtools
         tntdb
+        cxxtools
         fty_shm
-        libmlm
+        fty_proto
+        fty_common_logging
+    PRIVATE
 )
+
+##############################################################################################################
+
+etn_target(exe ${PROJECT_NAME}
+    SOURCES
+        src/fty_metric_store.cc
+    USES_PRIVATE
+        ${PROJECT_NAME}-lib
+)
+
+##############################################################################################################
+
+etn_test_target(${PROJECT_NAME}-lib
+    SOURCES
+        tests/actor_commands.cpp
+        tests/converter.cpp
+        tests/main.cpp
+        tests/metric_store_server.cpp
+    PREPROCESSOR
+        -DCATCH_CONFIG_FAST_COMPILE
+    SUBDIR
+        tests
+)
+
+##############################################################################################################
 
 #install resources files
 set(MS_SETTINGS_DIR "${CMAKE_INSTALL_FULL_LOCALSTATEDIR}/lib/fty/${PROJECT_NAME}")
@@ -51,42 +79,3 @@ install(FILES "${PROJECT_BINARY_DIR}/resources/fty-metric-store-cleaner.timer" D
 configure_file("${PROJECT_SOURCE_DIR}/resources/fty-metric-store-cleaner.service.in" "${PROJECT_BINARY_DIR}/resources/fty-metric-store-cleaner.service" @ONLY)
 install(FILES "${PROJECT_BINARY_DIR}/resources/fty-metric-store-cleaner.service" DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/systemd/system/)
 
-if (BUILD_TESTING)
-
-    etn_test(${PROJECT_NAME}-test
-        SOURCES
-            tests/main.cc
-            src/actor_commands.cc
-            src/converter.cc
-            src/multi_row.cc
-            src/persistance.cc
-            src/fty_metric_store_server.cc
-            src/fty_metric_store_private_selftest.cc
-        INCLUDE_DIRS
-            include
-        PREPROCESSOR -DCATCH_CONFIG_FAST_COMPILE
-        USES
-            czmq
-            fty_common_logging
-            fty_proto
-            cxxtools
-            tntdb
-            fty_shm
-            libmlm
-            Catch2::Catch2
-            stdc++fs
-            log4cplus
-    )
-
-    #copy selftest-ro for test
-    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/tests/selftest-ro DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-    file(MAKE_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}/selftest-rw)
-
-    #enable coverage
-    etn_coverage(${PROJECT_NAME}-test)
-
-    #copy selftest-ro for test coverage
-    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/tests/selftest-ro DESTINATION ${CMAKE_BINARY_DIR})
-    file(MAKE_DIRECTORY  ${CMAKE_BINARY_DIR}/selftest-rw)
-
-endif()

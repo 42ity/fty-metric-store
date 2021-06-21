@@ -20,77 +20,46 @@
     =========================================================================
 */
 
+#pragma once
 #include <functional>
-#ifndef PERSISTANCE_H_INCLUDED
-#define PERSISTANCE_H_INCLUDED
+#include <string>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
+namespace tntdb {
+class Connection;
+class Row;
+} // namespace tntdb
 
 // ----- table:  t_bios_measurement -------------------
 // ----- column: value --------------------------------
-typedef  int32_t m_msrmnt_value_t;
+typedef int32_t m_msrmnt_value_t;
 
 // ----- table:  t_bios_measurement -------------------
 // ----- column: scale --------------------------------
-typedef  int16_t  m_msrmnt_scale_t;
+typedef int16_t m_msrmnt_scale_t;
 
 // ----- table:  t_bios_measurement_topic -------------
 // ----- column: id  ----------------------------------
-typedef uint16_t  m_msrmnt_tpc_id_t;
+typedef uint16_t m_msrmnt_tpc_id_t;
 
 // ----- table:  t_bios_discovered_device -------------
 // ----- column: id_discovered_device -----------------
 typedef uint16_t m_dvc_id_t;
 
-int
-    insert_into_measurement(
-        tntdb::Connection &conn,
-        const char        *topic,
-        m_msrmnt_value_t   value,
-        m_msrmnt_scale_t   scale,
-        int64_t            time,
-        const char        *units,
-        const char        *device_name);
+int insert_into_measurement(tntdb::Connection& conn, const char* topic, m_msrmnt_value_t value, m_msrmnt_scale_t scale,
+    int64_t time, const char* units, const char* device_name);
 
-int
-    select_measurements (
-        const std::string &connurl,
-        const std::string &topic, // the whole topic XXX@YYY
-        int64_t start_timestamp,
-        int64_t end_timestamp,
-        std::function<void(
-                        const tntdb::Row&)>& cb,
-        bool is_ordered);
+int select_measurements(const std::string& connurl, const std::string& topic, int64_t start_timestamp,
+    int64_t end_timestamp, const std::function<void(const tntdb::Row&)>& cb, bool is_ordered);
 
-int
-    select_topic (
-        const std::string &connurl,
-        const std::string &topic, // the whole topic XXX@YYY
-        std::function<void(
-                        const tntdb::Row&)>& cb);
+int select_topic(
+    const std::string& connurl, const std::string& topic, const std::function<void(const tntdb::Row&)>& cb);
 
-int
-    delete_measurements(
-        tntdb::Connection &conn,
-        const char        *asset_name);
+int delete_measurements(tntdb::Connection& conn, const char* asset_name);
 
 //  Self test of this class
 //  Note: Keep this definition in sync with fty_metric_store_classes.h
-void
-    persistance_test (bool verbose);
+void persistance_test(bool verbose);
 
-void
-    flush_measurement_when_needed(std::string &url);
+void flush_measurement_when_needed(std::string& url);
 
-void
-    flush_measurement(std::string &url);
-//  @end
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif
+void flush_measurement(std::string& url);

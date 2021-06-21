@@ -20,12 +20,9 @@
     =========================================================================
 */
 
-#ifndef ACTOR_COMMANDS_H_INCLUDED
-#define ACTOR_COMMANDS_H_INCLUDED
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#pragma once
+#include <czmq.h>
+#include <malamute.h>
 
 //  @interface
 
@@ -50,18 +47,4 @@ extern "C" {
 // Performs the actor commands logic
 // Destroys the message
 // Returns 1 for $TERM (means exit), 0 otherwise
-int actor_commands (
-            mlm_client_t *client,
-            zmsg_t **message_p);
-
-//  Self test of this class
-//  Note: Keep this definition in sync with fty_metric_store_classes.h
-void actor_commands_test (bool verbose);
-
-//  @end
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif
+int actor_commands(mlm_client_t* client, zmsg_t** message_p);
