@@ -31,15 +31,15 @@ static const char* ENDPOINT   = "ipc://@/malamute";
 
 #define STEPS_SIZE 8
 static const char* STEPS[STEPS_SIZE]    = {"RT", "15m", "30m", "1h", "8h", "1d", "7d", "30d"};
-static const char* DEFAULTS[STEPS_SIZE] = {"0", "1", "1", "7", "7", "30", "30", "180"};
+static const char* DEFAULTS[STEPS_SIZE] = { "0",   "1",   "1",  "7",  "7", "30", "30", "180"};
 
 void usage()
 {
-    puts(
-        "fty-metric-store [options] ...\n"
+    printf(
+        "%s [options] ...\n"
         "  --verbose / -v         verbose mode\n"
         "  --config-file / -c     TODO\n"
-        "  --help / -h            this information\n");
+        "  --help / -h            this information\n", AGENT_NAME);
 }
 
 int main(int argc, char* argv[])
@@ -61,7 +61,7 @@ int main(int argc, char* argv[])
     bool verbose = false;
     while (true) {
         int option_index = 0;
-        int c            = getopt_long(argc, argv, short_options, long_options, &option_index);
+        int c = getopt_long(argc, argv, short_options, long_options, &option_index);
         if (c == -1)
             break;
 
@@ -70,7 +70,7 @@ int main(int argc, char* argv[])
                 verbose = true;
                 break;
             case 'c':
-                log_warning("--config-file switch not implemented yet (file: '%s')", optarg);
+                log_warning("%s: --config-file ignored (%s)", AGENT_NAME, optarg);
                 break;
             case 'h':
             default:
@@ -79,26 +79,27 @@ int main(int argc, char* argv[])
         }
     }
 
-    if (verbose)
-        ManageFtyLog::getInstanceFtylog()->setVeboseMode();
+    if (verbose) {
+        ManageFtyLog::getInstanceFtylog()->setVerboseMode();
+    }
 
     zactor_t* ms_server = zactor_new(fty_metric_store_server, nullptr);
     if (!ms_server) {
-        log_fatal("zactor_new (task = 'fty_metric_store_server', args = 'nullptr') failed");
+        log_fatal("%s: zactor_new failed", AGENT_NAME);
         return EXIT_FAILURE;
     }
 
     zstr_sendx(ms_server, "CONNECT", ENDPOINT, AGENT_NAME, nullptr);
-    // zstr_sendx (ms_server, "CONSUMER", FTY_PROTO_STREAM_METRICS, ".*", nullptr);
+
     zstr_sendx(ms_server, "CONSUMER", FTY_PROTO_STREAM_ASSETS, ".*", nullptr);
+    //zstr_sendx (ms_server, "CONSUMER", FTY_PROTO_STREAM_METRICS, ".*", nullptr);
 
     // setup the storage age
     for (int i = 0; i != STEPS_SIZE; i++) {
         const char* dfl = DEFAULTS[i];
 
         char* var_name = nullptr;
-        [[maybe_unused]] int   r        = asprintf(&var_name, "%s_%s", FTY_METRIC_STORE_CONF_PREFIX, STEPS[i]);
-        assert(r != -1);
+        asprintf(&var_name, "%s_%s", FTY_METRIC_STORE_CONF_PREFIX, STEPS[i]);
         if (var_name && getenv(var_name)) {
             dfl = getenv(var_name);
         }
@@ -107,21 +108,21 @@ int main(int argc, char* argv[])
         zstr_sendx(ms_server, FTY_METRIC_STORE_CONF_PREFIX, STEPS[i], dfl, nullptr);
     }
 
-    log_info("fty_metric_store started");
+    log_info("%s started", AGENT_NAME);
 
-    while (true) {
-        char* message = zstr_recv(ms_server);
-        if (message) {
-            puts(message);
-            zstr_free(&message);
-        } else {
-            puts("interrupted");
+    // main loop, accept any message back from server
+    // copy from src/malamute.c under MPL license
+    while (!zsys_interrupted) {
+        char* msg = zstr_recv(ms_server);
+        if (!msg)
             break;
-        }
+
+        log_debug("%s: recv msg '%s'", AGENT_NAME, msg);
+        zstr_free(&msg);
     }
 
     zactor_destroy(&ms_server);
-    log_info("fty_metric_store end");
+    log_info("%s ended", AGENT_NAME);
 
     return EXIT_SUCCESS;
 }

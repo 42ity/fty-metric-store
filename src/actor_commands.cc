@@ -29,6 +29,7 @@
 
 int actor_commands(mlm_client_t* client, zmsg_t** message_p)
 {
+    assert(client);
     assert(message_p && *message_p);
     zmsg_t* message = *message_p;
 
@@ -72,7 +73,8 @@ int actor_commands(mlm_client_t* client, zmsg_t** message_p)
 
         zstr_free(&name);
         zstr_free(&endpoint);
-    } else if (streq(cmd, "PRODUCER")) {
+    }
+    else if (streq(cmd, "PRODUCER")) {
         char* stream = zmsg_popstr(message);
 
         if (!stream) {
@@ -87,7 +89,8 @@ int actor_commands(mlm_client_t* client, zmsg_t** message_p)
         }
 
         zstr_free(&stream);
-    } else if (streq(cmd, "CONSUMER")) {
+    }
+    else if (streq(cmd, "CONSUMER")) {
         char* stream  = zmsg_popstr(message);
         char* pattern = zmsg_popstr(message);
 
@@ -108,7 +111,8 @@ int actor_commands(mlm_client_t* client, zmsg_t** message_p)
 
         zstr_free(&pattern);
         zstr_free(&stream);
-    } else if (streq(cmd, "CONFIGURE")) {
+    }
+    else if (streq(cmd, "CONFIGURE")) {
         char* config_file = zmsg_popstr(message);
         if (!config_file) {
             log_error(
@@ -119,9 +123,11 @@ int actor_commands(mlm_client_t* client, zmsg_t** message_p)
         }
 
         zstr_free(&config_file);
-    } else if (streq(cmd, FTY_METRIC_STORE_CONF_PREFIX)) {
+    }
+    else if (streq(cmd, FTY_METRIC_STORE_CONF_PREFIX)) {
         log_debug("%s is not yet implemented!", FTY_METRIC_STORE_CONF_PREFIX);
-    } else {
+    }
+    else {
         log_warning("Command '%s' is unknown or not implemented", cmd);
     }
 
