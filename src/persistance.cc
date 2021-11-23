@@ -47,7 +47,8 @@ int select_topic(const std::string& connurl, const std::string& topic, const std
         return 0;
     } catch (const tntdb::NotFound& e) {
         log_info("Topic '%s' not found.", topic.c_str());
-        return -2;
+		//return -2;
+        return 0; // this is not an error (no data instead)
     } catch (const std::exception& e) {
         log_error("Exception caught: %s", e.what());
         return -1;
