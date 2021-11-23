@@ -69,13 +69,12 @@ static std::mutex g_row_mutex;
  *          should be restarted in order to apply changes
  */
 
-static std::string url = std::string("mysql:db=box_utf8;user=") +
+static std::string DB_URL = std::string("mysql:db=box_utf8;user=") +
                          ((getenv("DB_USER") == nullptr) ? "root" : getenv("DB_USER")) +
                          ((getenv("DB_PASSWD") == nullptr) ? "" : std::string(";password=") + getenv("DB_PASSWD"));
 
-static zmsg_t* s_process_mailbox_aggregate([[maybe_unused]] mlm_client_t* client, zmsg_t** message_p)
+static zmsg_t* s_process_mailbox_aggregate(mlm_client_t* /*client*/, zmsg_t** message_p)
 {
-    assert(client);
     assert(message_p && *message_p);
 
     zmsg_t* msg_out = zmsg_new();
@@ -102,9 +101,9 @@ static zmsg_t* s_process_mailbox_aggregate([[maybe_unused]] mlm_client_t* client
         zmsg_addstr(msg_out, "BAD_MESSAGE");
         return msg_out;
     }
+
     bool bTest = streq(cmd, "GET_TEST");
 
-    // All declarations are before first "goto"
     char* asset_name     = zmsg_popstr(msg);
     char* quantity       = zmsg_popstr(msg);
     char* step           = zmsg_popstr(msg);
@@ -113,72 +112,105 @@ static zmsg_t* s_process_mailbox_aggregate([[maybe_unused]] mlm_client_t* client
     char* end_date_str   = zmsg_popstr(msg);
     char* ordered        = zmsg_popstr(msg);
 
-    bool                                   is_ordered = false;
-    int64_t                                start_date = 0;
-    int64_t                                end_date   = 0;
-    std::string                            topic;
-    std::function<void(const tntdb::Row&)> add_measurement;
-    std::function<void(const tntdb::Row&)> select_units;
-    std::string                            units;
-    int                                    rv;
+    do {
+        // macro facility (set error msg and break)
+        #define SET_ERROR_MSG_AND_BREAK(REASON) { \
+                zmsg_addstr(msg_out, "ERROR"); \
+                zmsg_addstr(msg_out, REASON); \
+                break; \
+            }
 
-#define ERROR_MSG_EXIT(REASON)                                                                                         \
-    {                                                                                                                  \
-        zmsg_addstr(msg_out, "ERROR");                                                                                 \
-        zmsg_addstr(msg_out, REASON);                                                                                  \
-        goto exit;                                                                                                     \
-    }
+        if (!asset_name || streq(asset_name, "")) {
+            log_error("asset name is empty");
+            SET_ERROR_MSG_AND_BREAK("BAD_MESSAGE");
+        }
+        if (!quantity || streq(quantity, "")) {
+            log_error("quantity is empty");
+            SET_ERROR_MSG_AND_BREAK("BAD_MESSAGE");
+        }
+        if (!step) {
+            log_error("step is empty");
+            SET_ERROR_MSG_AND_BREAK("BAD_MESSAGE");
+        }
+        if (!aggr_type) {
+            log_error("type of the aggregaation is empty");
+            SET_ERROR_MSG_AND_BREAK("BAD_MESSAGE");
+        }
+        if (!start_date_str) {
+            log_error("start date is empty");
+            SET_ERROR_MSG_AND_BREAK("BAD_MESSAGE");
+        }
+        if (!end_date_str) {
+            log_error("end date is empty");
+            SET_ERROR_MSG_AND_BREAK("BAD_MESSAGE");
+        }
+        if (!ordered) {
+            log_error("ordered is empty");
+            SET_ERROR_MSG_AND_BREAK("BAD_MESSAGE");
+        }
+        int64_t start_date = string_to_int64(start_date_str);
+        if (errno != 0) {
+            errno = 0;
+            log_error("start date cannot be converted to number");
+            SET_ERROR_MSG_AND_BREAK("BAD_MESSAGE");
+        }
+        int64_t end_date = string_to_int64(end_date_str);
+        if (errno != 0) {
+            errno = 0;
+            log_error("end date cannot be converted to number");
+            SET_ERROR_MSG_AND_BREAK("BAD_MESSAGE");
+        }
+        if (start_date > end_date) {
+            log_error("start date > end date");
+            SET_ERROR_MSG_AND_BREAK("BAD_TIMERANGE");
+        }
+        if (!streq(ordered, "1") && !streq(ordered, "0")) {
+            log_error("ordered is not 1/0");
+            SET_ERROR_MSG_AND_BREAK("BAD_ORDERED");
+        }
 
-    if (!asset_name || streq(asset_name, "")) {
-        log_error("asset name is empty");
-        ERROR_MSG_EXIT("BAD_MESSAGE");
-    }
-    if (!quantity || streq(quantity, "")) {
-        log_error("quantity is empty");
-        ERROR_MSG_EXIT("BAD_MESSAGE");
-    }
-    if (!step) {
-        log_error("step is empty");
-        ERROR_MSG_EXIT("BAD_MESSAGE");
-    }
-    if (!aggr_type) {
-        log_error("type of the aggregaation is empty");
-        ERROR_MSG_EXIT("BAD_MESSAGE");
-    }
-    if (!start_date_str) {
-        log_error("start date is empty");
-        ERROR_MSG_EXIT("BAD_MESSAGE");
-    }
-    if (!end_date_str) {
-        log_error("end date is empty");
-        ERROR_MSG_EXIT("BAD_MESSAGE");
-    }
-    if (!ordered) {
-        log_error("ordered is empty");
-        ERROR_MSG_EXIT("BAD_MESSAGE");
-    }
-    start_date = string_to_int64(start_date_str);
-    if (errno != 0) {
-        errno = 0;
-        log_error("start date cannot be converted to number");
-        ERROR_MSG_EXIT("BAD_MESSAGE");
-    }
-    end_date = string_to_int64(end_date_str);
-    if (errno != 0) {
-        errno = 0;
-        log_error("end date cannot be converted to number");
-        ERROR_MSG_EXIT("BAD_MESSAGE");
-    }
-    if (start_date > end_date) {
-        log_error("start date > end date");
-        ERROR_MSG_EXIT("BAD_TIMERANGE");
-    }
-    if (!streq(ordered, "1") && !streq(ordered, "0")) {
-        log_error("ordered is not 1/0");
-        ERROR_MSG_EXIT("BAD_ORDERED");
-    }
+        if (bTest) {
+            log_trace("test (cmd: %s)...", cmd);
+            zmsg_addstr(msg_out, "OK");
+            zmsg_addstr(msg_out, asset_name);
+            zmsg_addstr(msg_out, quantity);
+            zmsg_addstr(msg_out, step);
+            zmsg_addstr(msg_out, aggr_type);
+            zmsg_addstr(msg_out, start_date_str);
+            zmsg_addstr(msg_out, end_date_str);
+            zmsg_addstr(msg_out, ordered);
+            break;
+        }
 
-    if (bTest) {
+        std::string topic;
+        topic += quantity;
+        topic += "_"; // TODO: when ecpp files would be changed -> take another character
+        topic += aggr_type;
+        topic += "_"; // TODO: when ecpp files would be changed -> take another character
+        topic += step;
+        topic += "@";
+        topic += asset_name;
+
+        std::string units;
+        int rv = select_topic(DB_URL, topic, [&units](const tntdb::Row& r) {
+            r["units"].get(units);
+        });
+
+        log_debug("select topic (rv: %d, topic: '%s', units: '%s')", rv, topic.c_str(), units.c_str());
+
+        if (rv != 0) {
+            if (rv == -2) {
+                log_error("topic is not found (%s)", topic.c_str());
+                SET_ERROR_MSG_AND_BREAK("BAD_REQUEST");
+            }
+
+            // default
+            log_error("unexpected error during topic selection (%s)", topic.c_str());
+            SET_ERROR_MSG_AND_BREAK("INTERNAL_ERROR");
+            break;
+        }
+
+        // assume we are succeeded here, build OK frames
         zmsg_addstr(msg_out, "OK");
         zmsg_addstr(msg_out, asset_name);
         zmsg_addstr(msg_out, quantity);
@@ -187,72 +219,39 @@ static zmsg_t* s_process_mailbox_aggregate([[maybe_unused]] mlm_client_t* client
         zmsg_addstr(msg_out, start_date_str);
         zmsg_addstr(msg_out, end_date_str);
         zmsg_addstr(msg_out, ordered);
-        goto exit;
-    }
+        zmsg_addstr(msg_out, units.c_str());
 
-    topic += quantity;
-    topic += "_"; // TODO: when ecpp files would be changed -> take another character
-    topic += aggr_type;
-    topic += "_"; // TODO: when ecpp files would be changed -> take another character
-    topic += step;
-    topic += "@";
-    topic += asset_name;
+        std::function<void(const tntdb::Row&)> add_measurement;
+        add_measurement = [&msg_out](const tntdb::Row& r) {
+            m_msrmnt_value_t value = 0;
+            r["value"].get(value);
 
-    rv = select_topic(url, topic, [&units](const tntdb::Row& r) {
-        r["units"].get(units);
-    });
+            m_msrmnt_scale_t scale = 0;
+            r["scale"].get(scale);
+            double real_value = value * std::pow(10, scale);
 
-    if (rv != 0) {
-        // as we have prepared it for SUCCESS, but we failed in the end
-        zmsg_addstr(msg_out, "ERROR");
-        if (rv == -2) {
-            log_error("average request: topic is not found");
-            zmsg_addstr(msg_out, "BAD_REQUEST");
-        } else {
-            log_error("average request: unexpected error during topic selecting");
-            zmsg_addstr(msg_out, "INTERNAL_ERROR");
+            int64_t timestamp = 0;
+            r["timestamp"].get(timestamp);
+
+            zmsg_addstr(msg_out, std::to_string(timestamp).c_str());
+            zmsg_addstr(msg_out, std::to_string(real_value).c_str());
+        };
+
+        bool is_ordered = streq(ordered, "1");
+        rv = select_measurements(DB_URL, topic, start_date, end_date, add_measurement, is_ordered);
+        if (rv != 0) {
+            // as we have prepared it for SUCCESS, but we failed in the end
+            log_error("unexpected error during measurement selecting");
+            zmsg_destroy(&msg_out);
+            msg_out = zmsg_new();
+            SET_ERROR_MSG_AND_BREAK("INTERNAL_ERROR");
         }
-        goto exit;
-    }
 
-    zmsg_addstr(msg_out, "OK");
-    zmsg_addstr(msg_out, asset_name);
-    zmsg_addstr(msg_out, quantity);
-    zmsg_addstr(msg_out, step);
-    zmsg_addstr(msg_out, aggr_type);
-    zmsg_addstr(msg_out, start_date_str);
-    zmsg_addstr(msg_out, end_date_str);
-    zmsg_addstr(msg_out, ordered);
-    zmsg_addstr(msg_out, units.c_str());
+        break; // ok
+        #undef SET_ERROR_MSG_AND_BREAK
+    } while(0);
 
-    add_measurement = [&msg_out](const tntdb::Row& r) {
-        m_msrmnt_value_t value = 0;
-        r["value"].get(value);
-
-        m_msrmnt_scale_t scale = 0;
-        r["scale"].get(scale);
-        double real_value = value * std::pow(10, scale);
-
-        int64_t timestamp = 0;
-        r["timestamp"].get(timestamp);
-
-        zmsg_addstr(msg_out, std::to_string(timestamp).c_str());
-        zmsg_addstr(msg_out, std::to_string(real_value).c_str());
-    };
-
-    is_ordered = streq(ordered, "1");
-    rv         = select_measurements(url, topic, start_date, end_date, add_measurement, is_ordered);
-    if (rv != 0) {
-        // as we have prepared it for SUCCESS, but we failed in the end
-        log_error("unexpected error during measurement selecting");
-        zmsg_destroy(&msg_out);
-        msg_out = zmsg_new();
-        ERROR_MSG_EXIT("INTERNAL_ERROR");
-    }
-
-#undef ERROR_MSG_EXIT
-
-exit:
+    // cleanup
     zstr_free(&ordered);
     zstr_free(&end_date_str);
     zstr_free(&start_date_str);
@@ -267,17 +266,6 @@ exit:
 }
 
 //
-// SERVICE DELIVER processing
-//
-
-// static void s_handle_service (mlm_client_t *client, zmsg_t **message_p)
-//{
-//    assert (client && message_p && *message_p);
-//    log_error ("Service deliver is not implemented.");
-//    zmsg_destroy (message_p);
-//}
-
-//
 // MAILBOX DELIVER processing
 //
 
@@ -288,6 +276,7 @@ static void s_handle_mailbox(mlm_client_t* client, zmsg_t** message_p)
 
     const char* sender  = mlm_client_sender(client);
     const char* subject = mlm_client_subject(client);
+
     log_trace("IN handle MAILBOX DELIVER (subject %s from %s)", subject, sender);
 
     if (zmsg_size(*message_p) == 0) {
@@ -301,7 +290,8 @@ static void s_handle_mailbox(mlm_client_t* client, zmsg_t** message_p)
     zmsg_t* msg_out = nullptr;
     if (streq(subject, AVG_GRAPH)) {
         msg_out = s_process_mailbox_aggregate(client, message_p);
-    } else {
+    }
+    else {
         log_error("Bad subject %s from %s, ignoring", subject, sender);
         msg_out = zmsg_new();
         zmsg_addstr(msg_out, "ERROR");
@@ -358,7 +348,7 @@ static void s_process_stream_proto_metric(fty_proto_t* m)
     // connect & test db
     tntdb::Connection conn;
     try {
-        conn = tntdb::connectCached(url);
+        conn = tntdb::connectCached(DB_URL);
         conn.ping();
     } catch (const std::exception& e) {
         log_error("Can't connect to the database");
@@ -380,7 +370,7 @@ static void s_process_stream_proto_asset(fty_proto_t* m)
 
         tntdb::Connection conn;
         try {
-            conn = tntdb::connectCached(url);
+            conn = tntdb::connectCached(DB_URL);
             conn.ping();
         } catch (const std::exception& e) {
             log_error("Can't connect to the database");
@@ -393,9 +383,8 @@ static void s_process_stream_proto_asset(fty_proto_t* m)
     }
 }
 
-static void s_handle_stream([[maybe_unused]] mlm_client_t* client, zmsg_t** message_p)
+static void s_handle_stream(mlm_client_t* /*client*/, zmsg_t** message_p)
 {
-    assert(client); // notUsed
     assert(message_p && *message_p);
     log_trace("IN handle STREAM DELIVER");
 
@@ -459,7 +448,7 @@ static void s_process_pull_store_shm_metrics(fty::shm::shmMetrics& metrics)
         // connect & test db
         tntdb::Connection conn;
         try {
-            conn = tntdb::connectCached(url);
+            conn = tntdb::connectCached(DB_URL);
             conn.ping();
         } catch (const std::exception& e) {
             log_error("Can't connect to the database");
@@ -572,7 +561,7 @@ void fty_metric_store_server(zsock_t* pipe, void* /*args*/)
             last = now;
             // do a periodic flush
             g_row_mutex.lock();
-            flush_measurement_when_needed(url);
+            flush_measurement_when_needed(DB_URL);
             g_row_mutex.unlock();
         }
 
@@ -610,19 +599,19 @@ void fty_metric_store_server(zsock_t* pipe, void* /*args*/)
 
             if (!message) {
                 log_error("mlm_client_recv () returns nullptr");
-            } else if (!command) {
+            }
+            else if (!command) {
                 log_error("mlm_client_command () returns nullptr");
-            } else {
-                log_debug("fty_metric_store_server received command '%s'", command);
+            }
+            else {
+                log_debug("received command '%s'", command);
 
                 if (streq(command, "STREAM DELIVER")) {
                     s_handle_stream(client, &message);
-                } else if (streq(command, "MAILBOX DELIVER")) {
+                }
+                else if (streq(command, "MAILBOX DELIVER")) {
                     s_handle_mailbox(client, &message);
                 }
-                // else if (streq (command, "SERVICE DELIVER")) {
-                //    s_handle_service (client, &message);
-                //}
                 else {
                     log_error("Unrecognized mlm_client_command () = '%s'", command);
                 }
@@ -631,12 +620,9 @@ void fty_metric_store_server(zsock_t* pipe, void* /*args*/)
             zmsg_destroy(&message);
             continue;
         }
-
-        // paranoid assertion of a twisted mind
-        log_warning("which was checked for nullptr, pipe and `mlm_client_msgpipe (client)` but is not.");
     } // while
 
-    flush_measurement(url);
+    flush_measurement(DB_URL);
 
     zactor_destroy(&store_metrics_pull);
     zpoller_destroy(&poller);
