@@ -47,7 +47,6 @@ int select_topic(const std::string& connurl, const std::string& topic, const std
         return 0;
     } catch (const tntdb::NotFound& e) {
         log_info("Topic '%s' not found.", topic.c_str());
-		//return -2;
         return 0; // this is not an error (no data instead)
     } catch (const std::exception& e) {
         log_error("Exception caught: %s", e.what());
@@ -167,7 +166,7 @@ m_dvc_id_t prepare_discovered_device(tntdb::Connection& conn, const char* device
     }
 }
 
-// return topic_id or 0 in case of issue
+// return topic_id (>0) or 0 in case of issue
 m_msrmnt_tpc_id_t prepare_topic(tntdb::Connection& conn, const char* topic, const char* units, const char* device_name)
 {
     assert(topic);
@@ -189,13 +188,13 @@ m_msrmnt_tpc_id_t prepare_topic(tntdb::Connection& conn, const char* topic, cons
             "   UPDATE "
             "      id = LAST_INSERT_ID(id) ");
 
-        uint32_t n = st.set("topic", topic).set("units", units).set("device_id", id_discovered_device).execute();
+        st.set("topic", topic).set("units", units).set("device_id", id_discovered_device).execute();
 
         m_msrmnt_tpc_id_t topic_id = m_msrmnt_tpc_id_t(conn.lastInsertId());
         if (topic_id != 0) {
-            log_debug("[t_bios_measurement_topic]: inserted topic %s, #%d rows , topic_id %u", topic, n, topic_id);
+            //log_trace("[t_bios_measurement_topic]: inserted topic %s, topic_id %u", topic, topic_id);
         } else {
-            log_error("[t_bios_measurement_topic]:  topic %s not inserted", topic);
+            log_error("[t_bios_measurement_topic]: topic %s not inserted", topic);
         }
         return topic_id;
     } catch (const std::exception& e) {
@@ -205,26 +204,33 @@ m_msrmnt_tpc_id_t prepare_topic(tntdb::Connection& conn, const char* topic, cons
 }
 
 //
-void flush_measurement(tntdb::Connection& conn)
+static void flush_measurement(tntdb::Connection& conn)
 {
-    log_debug("Performing periodic flush");
+    log_trace("Performing periodic flush");
     try {
-        std::string query = g_RowCache.get_insert_query();
-        if (query.length() == 0) {
-            g_RowCache.reset_clock();
-            return;
+        std::string query;
+        g_RowCache.get_insert_query(query);
+        if (!query.empty()) {
+            tntdb::Statement st            = conn.prepare(query.c_str());
+            uint32_t         affected_rows = st.execute();
+            log_debug("[t_bios_measurement]: flush measurements from cache, inserted %d rows ", affected_rows);
         }
-        tntdb::Statement st            = conn.prepare(query.c_str());
-        uint32_t         affected_rows = st.execute();
-        log_debug("[t_bios_measurement]: flush measurements from cache, inserted %d rows ", affected_rows);
         g_RowCache.clear();
     } catch (const std::exception& e) {
-        log_error("Abnormal flush termination");
+        log_error("Abnormal flush termination (e: %s)", e.what());
+    }
+}
+
+// Do a flush only if cache is full or enough time elapsed since the last flush
+static void flush_measurement_when_needed(tntdb::Connection& conn)
+{
+    if (g_RowCache.is_ready_for_insert()) {
+        flush_measurement(conn);
     }
 }
 
 //
-void flush_measurement(std::string& url)
+void flush_measurement(const std::string& url)
 {
     tntdb::Connection conn;
     try {
@@ -237,22 +243,14 @@ void flush_measurement(std::string& url)
     flush_measurement(conn);
 }
 
-// Do a flush only if cache is full or enough time elapsed since the last flush
-void flush_measurement_when_needed(tntdb::Connection& conn)
-{
-    if (g_RowCache.is_ready_for_insert()) {
-        flush_measurement(conn);
-    }
-}
-
-void flush_measurement_when_needed(std::string& url)
+void flush_measurement_when_needed(const std::string& url)
 {
     if (g_RowCache.is_ready_for_insert()) {
         flush_measurement(url);
     }
 }
 
-//
+// returns 0 if success, else <0
 int insert_into_measurement(tntdb::Connection& conn, const char* topic, m_msrmnt_value_t value, m_msrmnt_scale_t scale,
     int64_t time, const char* units, const char* device_name)
 {
@@ -262,24 +260,25 @@ int insert_into_measurement(tntdb::Connection& conn, const char* topic, m_msrmnt
 
     if (topic[0] == '@') {
         log_error("malformed value of topic '%s' is not allowed", topic);
-        return 1;
+        return -1;
     }
 
     try {
         m_msrmnt_tpc_id_t topic_id = prepare_topic(conn, topic, units, device_name);
         if (topic_id == 0) {
             log_error("topic '%s' was not inserted -> cannot insert metric", topic);
-            return 1;
+            return -1;
         }
         g_RowCache.push_back(time, value, scale, topic_id);
         flush_measurement_when_needed(conn);
         return 0;
     } catch (const std::exception& e) {
         log_error("Metric with topic '%s' was not inserted with error: %s", topic, e.what());
-        return 1;
+        return -1;
     }
 }
 
+// returns 0 if success, else <0
 int delete_measurements(tntdb::Connection& conn, const char* asset_name)
 {
     assert(asset_name);
@@ -294,10 +293,10 @@ int delete_measurements(tntdb::Connection& conn, const char* asset_name)
             "   m.topic_id = mt.id AND "
             "   mt.topic like :name ");
         auto r = st.set("name", "%@" + std::string(asset_name)).execute();
-        log_info("deleted: %d", r);
+        log_info("%s deleted: %d", asset_name, r);
         return 0;
     } catch (const std::exception& e) {
-        log_error("Cannot delete measurements and topics: '%s'", e.what());
-        return 1;
+        log_error("Cannot delete '%s' measurements and topics (e: %s)", asset_name, e.what());
+        return -1;
     }
 }

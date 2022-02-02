@@ -56,10 +56,6 @@ int select_topic(
 
 int delete_measurements(tntdb::Connection& conn, const char* asset_name);
 
-//  Self test of this class
-//  Note: Keep this definition in sync with fty_metric_store_classes.h
-void persistance_test(bool verbose);
-
-void flush_measurement_when_needed(std::string& url);
-
-void flush_measurement(std::string& url);
+// update database measurements
+void flush_measurement_when_needed(const std::string& url);
+void flush_measurement(const std::string& url);
