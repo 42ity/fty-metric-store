@@ -86,7 +86,6 @@ static zmsg_t* s_process_mailbox_aggregate(mlm_client_t* /*client*/, zmsg_t** me
     }
 
     zmsg_t* msg = *message_p;
-
     if (zmsg_size(msg) < 8) {
         log_error("Message has unsupported format, ignore it");
         zmsg_destroy(message_p);
@@ -194,6 +193,10 @@ static zmsg_t* s_process_mailbox_aggregate(mlm_client_t* /*client*/, zmsg_t** me
             break;
         }
 
+        // build topic from inputs
+        // ex.: realpower.default_consumption_30d@rack-50718727
+        //      voltage.output.L1-N_max_7d@ups-44752195
+        //      current.output.L1_arithmetic_mean_15m@sts-38332489
         std::string topic;
         topic += quantity;
         topic += "_"; // TODO: when ecpp files would be changed -> take another character
@@ -235,25 +238,25 @@ static zmsg_t* s_process_mailbox_aggregate(mlm_client_t* /*client*/, zmsg_t** me
         std::function<void(const tntdb::Row&)> add_measurement;
         add_measurement = [&msg_out](const tntdb::Row& r) {
             m_msrmnt_value_t value = 0;
-            r["value"].get(value);
-
             m_msrmnt_scale_t scale = 0;
-            r["scale"].get(scale);
-            double real_value = value * std::pow(10, scale);
-
             int64_t timestamp = 0;
+
+            r["value"].get(value);
+            r["scale"].get(scale);
             r["timestamp"].get(timestamp);
 
+            double dblValue = value * std::pow(10, scale);
+
             zmsg_addstr(msg_out, std::to_string(timestamp).c_str());
-            zmsg_addstr(msg_out, std::to_string(real_value).c_str());
+            zmsg_addstr(msg_out, std::to_string(dblValue).c_str());
         };
 
         bool is_ordered = streq(ordered, "1");
         rv = select_measurements(DB_URL, topic, start_date, end_date, add_measurement, is_ordered);
 
         if (rv != 0) {
-            // as we have prepared it for SUCCESS, but we failed in the end
-            log_error("unexpected error during measurement selecting");
+            // finally we failed, must rebuild error msg
+            log_error("unexpected error during measurements selection");
             zmsg_destroy(&msg_out);
             msg_out = zmsg_new();
             SET_ERROR_MSG_AND_BREAK("INTERNAL_ERROR");
