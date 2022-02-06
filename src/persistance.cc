@@ -29,25 +29,30 @@
 
 static MultiRowCache g_RowCache;
 
-int select_topic(const std::string& connurl, const std::string& topic, const std::function<void(const tntdb::Row&)>& cb)
+//
+int select_topic(
+    const std::string& connurl,
+    const std::string& topic,
+    const std::function<void(const tntdb::Row&)>& cb
+)
 {
     try {
-        tntdb::Connection conn = tntdb::connectCached(connurl);
-
-        tntdb::Statement st = conn.prepareCached(
+        std::string query =
             " SELECT "
-            "   * "
-            " FROM v_bios_measurement_topic "
+            "   id, units "
+            " FROM t_bios_measurement_topic "
             " WHERE "
-            "   topic = :topic ");
+            "   topic = :topic ";
 
+        tntdb::Connection conn = tntdb::connectCached(connurl);
+        tntdb::Statement st = conn.prepareCached(query);
         tntdb::Row row = st.set("topic", topic).selectRow();
 
         cb(row);
         return 0;
     } catch (const tntdb::NotFound& e) {
-        log_info("Topic '%s' not found.", topic.c_str());
-        return 0; // this is not an error (no data instead)
+        log_debug("Topic '%s' not found", topic.c_str());
+        return 0; // not an error
     } catch (const std::exception& e) {
         log_error("Exception caught: %s", e.what());
         return -1;
@@ -58,27 +63,32 @@ int select_topic(const std::string& connurl, const std::string& topic, const std
 }
 
 //
-int select_measurements(const std::string& connurl, const std::string& topic, int64_t start_timestamp,
-    int64_t end_timestamp, const std::function<void(const tntdb::Row&)>& cb, bool is_ordered)
+int select_measurements(
+    const std::string& connurl,
+    m_msrmnt_tpc_id_t topic_id,
+    int64_t start_timestamp,
+    int64_t end_timestamp,
+    bool ordered,
+    const std::function<void(const tntdb::Row&)>& cb
+)
 {
     try {
-        tntdb::Connection conn = tntdb::connectCached(connurl);
-        std::string       query =
+        std::string query =
             " SELECT "
-            "   topic, value, scale, timestamp, units "
-            " FROM v_bios_measurement "
+            "   value, scale, timestamp "
+            " FROM t_bios_measurement "
             " WHERE "
-            "   topic = :topic AND "
+            "   topic_id = :topic_id AND "
             "   timestamp >= :time_st AND "
             "   timestamp <= :time_end ";
-        if (is_ordered) {
+        if (ordered) {
             query += " ORDER BY timestamp ASC";
         }
+
+        tntdb::Connection conn = tntdb::connectCached(connurl);
         tntdb::Statement st = conn.prepareCached(query);
-        // ACE: I know, that topic_id would have better performance, but
-        // for first iteration lets stay with this approach
         tntdb::Result result =
-            st.set("topic", topic).set("time_st", start_timestamp).set("time_end", end_timestamp).select();
+            st.set("topic_id", topic_id).set("time_st", start_timestamp).set("time_end", end_timestamp).select();
 
         for (const auto& row : result) {
             cb(row);
@@ -93,12 +103,16 @@ int select_measurements(const std::string& connurl, const std::string& topic, in
     }
 }
 
-m_dvc_id_t insert_as_not_classified_device(tntdb::Connection& conn, const char* device_name)
+m_dvc_id_t insert_as_not_classified_device(
+    tntdb::Connection& conn,
+    const char* device_name
+)
 {
     if (device_name == NULL || device_name[0] == 0) {
         log_error("[t_bios_discovered_device] can't insert a device with NULL or non device name");
         return 0;
     }
+
     m_dvc_id_t       id_discovered_device = 0;
     tntdb::Statement st;
     st = conn.prepareCached(
@@ -137,12 +151,15 @@ m_dvc_id_t insert_as_not_classified_device(tntdb::Connection& conn, const char* 
 }
 
 // return id_discovered_device or 0 in case of issue
-m_dvc_id_t prepare_discovered_device(tntdb::Connection& conn, const char* device_name)
+m_dvc_id_t prepare_discovered_device(
+    tntdb::Connection& conn,
+    const char* device_name
+)
 {
     assert(device_name);
 
     // verify if the device name exists in t_bios_discovered_device
-    // if not create it as not_classified device type
+    // if not, create it as not_classified device type
     tntdb::Statement st = conn.prepareCached(
         " SELECT id_discovered_device "
         " FROM "
@@ -150,6 +167,7 @@ m_dvc_id_t prepare_discovered_device(tntdb::Connection& conn, const char* device
         " WHERE "
         "   v.name = :name");
     st.set("name", device_name);
+
     try {
         m_dvc_id_t id_discovered_device = 0;
         tntdb::Row row                  = st.selectRow();
@@ -192,9 +210,9 @@ m_msrmnt_tpc_id_t prepare_topic(tntdb::Connection& conn, const char* topic, cons
 
         m_msrmnt_tpc_id_t topic_id = m_msrmnt_tpc_id_t(conn.lastInsertId());
         if (topic_id != 0) {
-            //log_trace("[t_bios_measurement_topic]: inserted topic %s, topic_id %u", topic, topic_id);
+            //log_trace("inserted topic %s, topic_id %u", topic, topic_id);
         } else {
-            log_error("[t_bios_measurement_topic]: topic %s not inserted", topic);
+            log_error("topic %s not inserted", topic);
         }
         return topic_id;
     } catch (const std::exception& e) {
@@ -213,11 +231,11 @@ static void flush_measurement(tntdb::Connection& conn)
         if (!query.empty()) {
             tntdb::Statement st            = conn.prepare(query.c_str());
             uint32_t         affected_rows = st.execute();
-            log_debug("[t_bios_measurement]: flush measurements from cache, inserted %d rows ", affected_rows);
+            log_debug("flush measurements from cache, inserted %d rows ", affected_rows);
         }
         g_RowCache.clear();
     } catch (const std::exception& e) {
-        log_error("Abnormal flush termination (e: %s)", e.what());
+        log_error("unexpected flush termination (e: %s)", e.what());
     }
 }
 
@@ -243,6 +261,7 @@ void flush_measurement(const std::string& url)
     flush_measurement(conn);
 }
 
+//
 void flush_measurement_when_needed(const std::string& url)
 {
     if (g_RowCache.is_ready_for_insert()) {

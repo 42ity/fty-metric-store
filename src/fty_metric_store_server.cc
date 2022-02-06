@@ -206,18 +206,23 @@ static zmsg_t* s_process_mailbox_aggregate(mlm_client_t* /*client*/, zmsg_t** me
         topic += "@";
         topic += asset_name;
 
-        std::string units;
-        int rv = select_topic(DB_URL, topic, [&units](const tntdb::Row& r) {
-            r["units"].get(units);
+        bool topic_exists{false};
+        m_msrmnt_tpc_id_t topic_id{0};
+        std::string topic_units;
+        int rv = select_topic(DB_URL, topic, [&topic_exists,&topic_id,&topic_units](const tntdb::Row& r) {
+            topic_exists = true;
+            r["id"].get(topic_id);
+            r["units"].get(topic_units);
         });
 
-        log_trace("select topic (rv: %d, topic: '%s', units: '%s')", rv, topic.c_str(), units.c_str());
+        log_trace("select topic, rv: %d, exists: %s, topic: '%s', id: %d, units: '%s'",
+            rv, (topic_exists ? "true" : "false"), topic.c_str(), topic_id, topic_units.c_str());
 
         if (rv != 0) {
-            if (rv == -2) {
-                log_error("topic is not found (%s)", topic.c_str());
-                SET_ERROR_MSG_AND_BREAK("BAD_REQUEST");
-            }
+            //if (rv == -2) {
+            //    log_error("topic is not found (%s)", topic.c_str());
+            //    SET_ERROR_MSG_AND_BREAK("BAD_REQUEST");
+            //}
 
             // default
             log_error("unexpected error during topic selection (%s)", topic.c_str());
@@ -233,33 +238,37 @@ static zmsg_t* s_process_mailbox_aggregate(mlm_client_t* /*client*/, zmsg_t** me
         zmsg_addstr(msg_out, start_date_str);
         zmsg_addstr(msg_out, end_date_str);
         zmsg_addstr(msg_out, ordered);
-        zmsg_addstr(msg_out, units.c_str());
+        zmsg_addstr(msg_out, (topic_exists ? topic_units.c_str() : ""));
 
-        std::function<void(const tntdb::Row&)> add_measurement;
-        add_measurement = [&msg_out](const tntdb::Row& r) {
-            m_msrmnt_value_t value = 0;
-            m_msrmnt_scale_t scale = 0;
-            int64_t timestamp = 0;
+        if (topic_exists) {
+            // complete msg_out with topic measurements
 
-            r["value"].get(value);
-            r["scale"].get(scale);
-            r["timestamp"].get(timestamp);
+            std::function<void(const tntdb::Row&)> add_measurement;
+            add_measurement = [&msg_out](const tntdb::Row& r) {
+                m_msrmnt_value_t value = 0;
+                m_msrmnt_scale_t scale = 0;
+                int64_t timestamp = 0;
 
-            double dblValue = value * std::pow(10, scale);
+                r["value"].get(value);
+                r["scale"].get(scale);
+                r["timestamp"].get(timestamp);
 
-            zmsg_addstr(msg_out, std::to_string(timestamp).c_str());
-            zmsg_addstr(msg_out, std::to_string(dblValue).c_str());
-        };
+                double dblValue = value * std::pow(10, scale);
 
-        bool is_ordered = streq(ordered, "1");
-        rv = select_measurements(DB_URL, topic, start_date, end_date, add_measurement, is_ordered);
+                zmsg_addstr(msg_out, std::to_string(timestamp).c_str());
+                zmsg_addstr(msg_out, std::to_string(dblValue).c_str());
+            };
 
-        if (rv != 0) {
-            // finally we failed, must rebuild error msg
-            log_error("unexpected error during measurements selection");
-            zmsg_destroy(&msg_out);
-            msg_out = zmsg_new();
-            SET_ERROR_MSG_AND_BREAK("INTERNAL_ERROR");
+            bool is_ordered = streq(ordered, "1");
+            rv = select_measurements(DB_URL, topic_id, start_date, end_date, is_ordered, add_measurement);
+
+            if (rv != 0) {
+                // finally we failed, must rebuild error msg
+                log_error("unexpected error during measurements selection");
+                zmsg_destroy(&msg_out);
+                msg_out = zmsg_new();
+                SET_ERROR_MSG_AND_BREAK("INTERNAL_ERROR");
+            }
         }
 
         break; // ok
@@ -440,10 +449,13 @@ static void s_handle_stream(mlm_client_t* /*client*/, zmsg_t** message_p)
 static void s_process_pull_store_shm_metrics(fty::shm::shmMetrics& metrics)
 {
     int64_t lap = zclock_mono();
-    log_trace("IN s_process_pull_store_shm_metrics (size: %zu)", metrics.size());
+    log_trace("IN pull_store_shm_metrics (metrics size: %zu)", metrics.size());
 
     int cntDbConnectFailed = 0;
     for (auto& m : metrics) {
+        if (zsys_interrupted)
+            break;
+
         assert(m);
         // TODO: implement FTY_STORE_AGE_ support
 
@@ -488,7 +500,7 @@ static void s_process_pull_store_shm_metrics(fty::shm::shmMetrics& metrics)
             continue;
         }
 
-        // time is a time when message was received
+        // time is the time when message was received
         uint64_t _time = fty_proto_time(m);
         insert_into_measurement(
             conn,
@@ -503,21 +515,22 @@ static void s_process_pull_store_shm_metrics(fty::shm::shmMetrics& metrics)
         // inserted, flag this metric (write in shm)
         auto now = uint64_t(time(nullptr));
         if ((fty_proto_time(m) + fty_proto_ttl(m)) < now) {
-            uint32_t remain_ttl = uint32_t(fty_proto_time(m) + fty_proto_ttl(m) - now);
+            uint32_t remaining_ttl = uint32_t(fty_proto_time(m) + fty_proto_ttl(m) - now);
 
-            fty_proto_set_ttl(m, remain_ttl);
+            fty_proto_set_ttl(m, remaining_ttl);
             fty_proto_aux_insert(m, "x-ms-flag", "1");
             fty::shm::write_metric(m);
         }
     }
 
     lap = zclock_mono() - lap;
-    log_trace("OUT s_process_pull_store_shm_metrics, connFailed: %d, lap: %ju ms", cntDbConnectFailed, lap);
+    log_trace("OUT pull_store_shm_metrics, connFailed: %d, lap: %ju ms", cntDbConnectFailed, lap);
 }
 
 void fty_metric_store_metric_pull(zsock_t* pipe, void* /*args*/)
 {
     assert(pipe);
+
     zpoller_t* poller = zpoller_new(pipe, nullptr);
     assert(poller);
 
@@ -535,8 +548,8 @@ void fty_metric_store_metric_pull(zsock_t* pipe, void* /*args*/)
             }
 
             if (zpoller_expired(poller)) {
+                log_trace("IN metrics pull");
                 int64_t lap = zclock_mono();
-                log_trace("IN metrics poller");
 
                 fty::shm::shmMetrics result;
                 fty::shm::read_metrics(".*", ".*", result);
@@ -546,7 +559,7 @@ void fty_metric_store_metric_pull(zsock_t* pipe, void* /*args*/)
                 g_row_mutex.unlock();
 
                 lap = zclock_mono() - lap;
-                log_trace("OUT metrics poller, lap: %ju ms", lap);
+                log_trace("OUT metrics pull, lap: %ju ms", lap);
             }
 
             timeout = uint64_t(fty_get_polling_interval() * 1000);
@@ -614,7 +627,6 @@ void fty_metric_store_server(zsock_t* pipe, void* /*args*/)
             }
 
             if (zpoller_terminated(poller) || zsys_interrupted) {
-                log_warning("zpoller_terminated () or zsys_interrupted");
                 break;
             }
             continue;

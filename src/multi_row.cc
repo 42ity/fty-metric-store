@@ -82,7 +82,7 @@ bool MultiRowCache::is_ready_for_insert() const
             return true;
         }
 
-        // time to flush measurements ?
+        // delayed time to flush ?
         long now_ms              = get_clock_ms();
         long elapsed_periodic_ms = now_ms - _first_ms;
         if (elapsed_periodic_ms >= (long(_max_delay_s) * 1000)) {
@@ -125,6 +125,6 @@ void MultiRowCache::get_insert_query(std::string& query) const
     query.append(values);
     query.append(" ON DUPLICATE KEY UPDATE value=VALUES(value),scale=VALUES(scale) ");
 
-    //log_debug("query %s", query.c_str());
-    log_trace("insert query, size: %zu", _row_cache.size());
+    //log_debug("insert query, %s", query.c_str());
+    log_trace("insert query, cache size: %zu", _row_cache.size());
 }
