@@ -1,14 +1,51 @@
 #include <catch2/catch.hpp>
+#include <iostream>
 #include <fty_log.h>
 #include "src/converter2.h"
+
+TEST_CASE("converter2 test StringToInt64 #1")
+{
+    ManageFtyLog::setInstanceFtylog("converter2");
+    const bool verbose{false};
+
+    struct {
+        std::string string;
+        int success; // expected
+        int64_t value; // if success
+    } tVector[] = {
+    //
+        {"", false, 0},
+        {"a", false, 0},
+        {"0a", false, 0},
+        {"a1", false, 0},
+        {" ", false, 0},
+    //
+        {"0", true, 0},
+        {"-0", true, 0},
+        {"1", true, 1},
+        {"-1", true, -1},
+        {"1234", true, 1234},
+        {"-1234", true, -1234},
+        {"123412341234", true, 123412341234},
+        {"-123412341234", true, -123412341234},
+    };
+
+    for (auto& test : tVector) {
+        int64_t value = StringToInt64(test.string);
+        if (verbose) {
+            std::cout << "StringToInt64('" << test.string << "'): errno: " << errno << ", value: " << value << std::endl;
+        }
+        CHECK((errno == 0) == test.success);
+        if (errno == 0) {
+            CHECK(value == test.value);
+        }
+    }
+}
 
 TEST_CASE("converter2 test StringToNumber #1")
 {
     ManageFtyLog::setInstanceFtylog("converter2");
     //converterSetVerbose(true);
-
-    Number n;
-    int r;
 
     struct {
         std::string string;
@@ -35,6 +72,9 @@ TEST_CASE("converter2 test StringToNumber #1")
         {"0 ", false, Number()}, // stod don't trim right!
     };
 
+    Number n;
+    int r;
+
     for (auto& test : tVector) {
         r = StringToNumber(test.string, n);
         n.dump(">" + test.string);
@@ -50,10 +90,7 @@ TEST_CASE("converter2 test StringToNumber #1")
 TEST_CASE("converter2 test StringToNumber #2")
 {
     ManageFtyLog::setInstanceFtylog("converter2");
-    converterSetVerbose(true);
-
-    Number n;
-    int r;
+    //converterSetVerbose(true);
 
     struct {
         std::string string;
@@ -112,6 +149,9 @@ TEST_CASE("converter2 test StringToNumber #2")
     //    {"72057594037927934", true, Number(72057594037927934, 0)},
     };
 
+    Number n;
+    int r;
+
     for (auto& test : tVector) {
         r = StringToNumber(test.string, n);
         n.dump(">" + test.string);
@@ -128,9 +168,6 @@ TEST_CASE("converter2 test StringToNumber #3")
 {
     ManageFtyLog::setInstanceFtylog("converter2");
     //converterSetVerbose(true);
-
-    Number n;
-    int r;
 
     struct {
         std::string string;
@@ -182,6 +219,9 @@ TEST_CASE("converter2 test StringToNumber #3")
         {"-0.999999999", true, Number(-999999999, -9)},
     };
 
+    Number n;
+    int r;
+
     for (auto& test : tVector) {
         r = StringToNumber(test.string, n);
         n.dump(">" + test.string);
@@ -198,9 +238,6 @@ TEST_CASE("converter2 test StringToNumber #4")
 {
     ManageFtyLog::setInstanceFtylog("converter2");
     //converterSetVerbose(true);
-
-    Number n;
-    int r;
 
     struct {
         std::string string;
@@ -244,6 +281,9 @@ TEST_CASE("converter2 test StringToNumber #4")
         {"3.141592653", true, Number(3141592653, -9)},
     };
 
+    Number n;
+    int r;
+
     for (auto& test : tVector) {
         r = StringToNumber(test.string, n);
         n.dump(">" + test.string);
@@ -260,9 +300,6 @@ TEST_CASE("converter2 test StringToNumber #5")
 {
     ManageFtyLog::setInstanceFtylog("converter2");
     //converterSetVerbose(true);
-
-    Number n;
-    int r;
 
     struct {
         std::string string;
@@ -292,6 +329,9 @@ TEST_CASE("converter2 test StringToNumber #5")
         {"-0x1", true, Number(-1, 0)},
         {"0xabcd", true, Number(0xabcd, 0)},
     };
+
+    Number n;
+    int r;
 
     for (auto& test : tVector) {
         r = StringToNumber(test.string, n);

@@ -155,7 +155,8 @@ static int DoubleToNumber (double value, Number& number)
     return 0; // ok
 }
 
-// head converter
+// Number converter
+// returns 0 if success (number is set), else <0
 int StringToNumber (const std::string& string, Number& number)
 {
     // parse double value from the input string
@@ -201,4 +202,28 @@ int StringToNumber (const std::string& string, Number& number)
 
     // convert
     return DoubleToNumber(value, number);
+}
+
+// int64 converter
+// success if errno == 0, else failed
+int64_t StringToInt64(const std::string& string)
+{
+    int64_t ret{0};
+
+    errno = 0;
+    if (string.empty()) {
+        errno = EINVAL;
+    }
+    else {
+        char* end = NULL;
+        ret = strtoll(string.c_str(), &end, 10);
+        if (*end) {
+            errno = EINVAL;
+        }
+    }
+
+    if (errno == 0) {
+        return ret; // ok
+    }
+    return INT64_MAX;
 }
