@@ -47,7 +47,7 @@ void converterSetVerbose(bool verb);
 
 // Number converter
 // returns 0 if success (number is set), else <0
-int StringToNumber (const std::string& string, Number& number);
+int StringToNumber(const std::string& string, Number& number);
 
 // int64 converter
 // success if errno == 0, else failed

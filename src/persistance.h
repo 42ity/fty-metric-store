@@ -30,7 +30,7 @@ class Row;
 } // namespace tntdb
 
 // t_bios_measurement/value
-typedef int32_t m_msrmnt_value_t;
+typedef int64_t m_msrmnt_value_t;
 // t_bios_measurement/scale
 typedef int16_t m_msrmnt_scale_t;
 // t_bios_measurement_topic/id

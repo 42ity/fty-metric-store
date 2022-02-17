@@ -90,7 +90,7 @@ void Number::dump(const std::string& prefix) const
 
 // convert a double to a Number
 // returns 0 if success, else <0
-static int DoubleToNumber (double value, Number& number)
+static int DoubleToNumber(double value, Number& number)
 {
     number.clear();
 
@@ -157,7 +157,7 @@ static int DoubleToNumber (double value, Number& number)
 
 // Number converter
 // returns 0 if success (number is set), else <0
-int StringToNumber (const std::string& string, Number& number)
+int StringToNumber(const std::string& string, Number& number)
 {
     // parse double value from the input string
     double value;
