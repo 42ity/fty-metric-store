@@ -102,7 +102,7 @@ void MultiRowCache::push_back(int64_t time, m_msrmnt_value_t value, m_msrmnt_sca
 
     // multiple row insertion request, in *order* (see get_insert_query())
     char val[64];
-    snprintf(val, sizeof(val), "(%" PRIu64 ",%" PRIi64 ",%" PRIi16 ",%" PRIi16 ")", time, value, scale, topic_id);
+    snprintf(val, sizeof(val), "(%" PRIu64 ",%" PRIi64 ",%" PRIi16 ",%" PRIi32 ")", time, value, scale, topic_id);
     _row_cache.push_back(val);
 }
 

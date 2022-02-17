@@ -208,11 +208,15 @@ m_msrmnt_tpc_id_t prepare_topic(tntdb::Connection& conn, const char* topic, cons
 
         st.set("topic", topic).set("units", units).set("device_id", id_discovered_device).execute();
 
+        //if (conn.lastInsertId() != m_msrmnt_tpc_id_t(conn.lastInsertId())) {
+        //    logError("conn.lastInsertId(): {} neq. {}", conn.lastInsertId(), m_msrmnt_tpc_id_t(conn.lastInsertId()));
+        //}
+
         m_msrmnt_tpc_id_t topic_id = m_msrmnt_tpc_id_t(conn.lastInsertId());
         if (topic_id != 0) {
             //log_trace("inserted topic %s, topic_id %u", topic, topic_id);
         } else {
-            log_error("topic %s not inserted", topic);
+            log_error("topic '%s' not inserted", topic);
         }
         return topic_id;
     } catch (const std::exception& e) {
