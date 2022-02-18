@@ -243,8 +243,8 @@ static zmsg_t* s_process_mailbox_aggregate(mlm_client_t* /*client*/, zmsg_t** me
         if (topic_exists) {
             // complete msg_out with topic measurements
 
-            std::function<void(const tntdb::Row&)> add_measurement;
-            add_measurement = [&msg_out](const tntdb::Row& r) {
+            std::function<void(const tntdb::Row&)> add_measurement([msg_out](const tntdb::Row& r)
+            {
                 m_msrmnt_value_t value = 0;
                 m_msrmnt_scale_t scale = 0;
                 int64_t timestamp = 0;
@@ -257,7 +257,7 @@ static zmsg_t* s_process_mailbox_aggregate(mlm_client_t* /*client*/, zmsg_t** me
 
                 zmsg_addstr(msg_out, std::to_string(timestamp).c_str());
                 zmsg_addstr(msg_out, std::to_string(dblValue).c_str());
-            };
+            });
 
             bool is_ordered = streq(ordered, "1");
             rv = select_measurements(DB_URL, topic_id, start_date, end_date, is_ordered, add_measurement);
