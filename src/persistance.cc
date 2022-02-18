@@ -185,7 +185,12 @@ m_dvc_id_t prepare_discovered_device(
 }
 
 // return topic_id (>0) or 0 in case of issue
-m_msrmnt_tpc_id_t prepare_topic(tntdb::Connection& conn, const char* topic, const char* units, const char* device_name)
+m_msrmnt_tpc_id_t prepare_topic(
+    tntdb::Connection& conn,
+    const char* topic,
+    const char* units,
+    const char* device_name
+)
 {
     assert(topic);
     assert(units);
@@ -274,8 +279,15 @@ void flush_measurement_when_needed(const std::string& url)
 }
 
 // returns 0 if success, else <0
-int insert_into_measurement(tntdb::Connection& conn, const char* topic, m_msrmnt_value_t value, m_msrmnt_scale_t scale,
-    int64_t time, const char* units, const char* device_name)
+int insert_into_measurement(
+    tntdb::Connection& conn,
+    const char* topic,
+    m_msrmnt_value_t value,
+    m_msrmnt_scale_t scale,
+    int64_t time,
+    const char* units,
+    const char* device_name
+)
 {
     assert(units);
     assert(device_name);
@@ -302,7 +314,10 @@ int insert_into_measurement(tntdb::Connection& conn, const char* topic, m_msrmnt
 }
 
 // returns 0 if success, else <0
-int delete_measurements(tntdb::Connection& conn, const char* asset_name)
+int delete_measurements(
+    tntdb::Connection& conn,
+    const char* asset_name
+)
 {
     assert(asset_name);
 

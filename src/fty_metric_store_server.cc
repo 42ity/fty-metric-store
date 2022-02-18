@@ -113,7 +113,7 @@ static zmsg_t* s_process_mailbox_aggregate(mlm_client_t* /*client*/, zmsg_t** me
     char* end_date_str   = zmsg_popstr(msg);
     char* ordered        = zmsg_popstr(msg);
 
-    log_info("IN handle MAILBOX aggregate: asset: %s, quantity: %s, step: %s, aggr_type: %s, start: %s, end: %s, ordered: %s",
+    log_debug("IN handle MAILBOX aggregate: asset: %s, quantity: %s, step: %s, aggr_type: %s, start: %s, end: %s, ordered: %s",
         asset_name,
         quantity,
         step,
@@ -243,8 +243,8 @@ static zmsg_t* s_process_mailbox_aggregate(mlm_client_t* /*client*/, zmsg_t** me
         if (topic_exists) {
             // complete msg_out with topic measurements
 
-            std::function<void(const tntdb::Row&)> add_measurement;
-            add_measurement = [&msg_out](const tntdb::Row& r) {
+            std::function<void(const tntdb::Row&)> add_measurement([msg_out](const tntdb::Row& r)
+            {
                 m_msrmnt_value_t value = 0;
                 m_msrmnt_scale_t scale = 0;
                 int64_t timestamp = 0;
@@ -257,7 +257,7 @@ static zmsg_t* s_process_mailbox_aggregate(mlm_client_t* /*client*/, zmsg_t** me
 
                 zmsg_addstr(msg_out, std::to_string(timestamp).c_str());
                 zmsg_addstr(msg_out, std::to_string(dblValue).c_str());
-            };
+            });
 
             bool is_ordered = streq(ordered, "1");
             rv = select_measurements(DB_URL, topic_id, start_date, end_date, is_ordered, add_measurement);
@@ -287,7 +287,7 @@ static zmsg_t* s_process_mailbox_aggregate(mlm_client_t* /*client*/, zmsg_t** me
     zmsg_destroy(message_p);
 
     lap = zclock_mono() - lap;
-    log_info("OUT handle MAILBOX aggregate, lap: %ju ms", lap);
+    log_debug("OUT handle MAILBOX aggregate, lap: %ju ms", lap);
 
     return msg_out;
 }
@@ -496,7 +496,7 @@ static void s_process_pull_store_shm_metrics(fty::shm::shmMetrics& metrics)
 
         // time is the time when message was received
         uint64_t _time = fty_proto_time(m);
-        insert_into_measurement(
+        int r = insert_into_measurement(
             conn,
             db_topic.c_str(),
             number.value,
@@ -505,15 +505,18 @@ static void s_process_pull_store_shm_metrics(fty::shm::shmMetrics& metrics)
             fty_proto_unit(m),
             fty_proto_name(m)
         );
+        if (r != 0) {
+            log_debug("insert_into_measurement failed (r: %d)", r);
+        }
+        else { // successfully inserted, flag this metric (write in shm)
+            auto now = uint64_t(time(nullptr));
+            if ((fty_proto_time(m) + fty_proto_ttl(m)) < now) {
+                uint32_t remaining_ttl = uint32_t(fty_proto_time(m) + fty_proto_ttl(m) - now);
 
-        // inserted, flag this metric (write in shm)
-        auto now = uint64_t(time(nullptr));
-        if ((fty_proto_time(m) + fty_proto_ttl(m)) < now) {
-            uint32_t remaining_ttl = uint32_t(fty_proto_time(m) + fty_proto_ttl(m) - now);
-
-            fty_proto_set_ttl(m, remaining_ttl);
-            fty_proto_aux_insert(m, "x-ms-flag", "1");
-            fty::shm::write_metric(m);
+                fty_proto_set_ttl(m, remaining_ttl);
+                fty_proto_aux_insert(m, "x-ms-flag", "1");
+                fty::shm::write_metric(m);
+            }
         }
     }
 
