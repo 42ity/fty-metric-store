@@ -70,6 +70,9 @@ TEST_CASE("converter test")
     CHECK(integer == 1);
     CHECK(scale == 0);
 
+    //31857762450 = 7 6ADE E092
+    CHECK(stobiosf("31857762450.0", integer, scale) == false); //FIXME, shall be true (int32 VS int64?)
+
     CHECK(stobiosf("1234324532452345623541.00", integer, scale) == false);
 
     CHECK(stobiosf("2.532132356545624522452456", integer, scale) == false);

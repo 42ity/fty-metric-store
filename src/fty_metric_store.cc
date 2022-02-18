@@ -52,8 +52,12 @@ int main(int argc, char* argv[])
 #pragma GCC diagnostic ignored "-Wwrite-strings"
 #endif
     static const char*   short_options  = "hvc:";
-    static struct option long_options[] = {{"help", no_argument, 0, 1}, {"verbose", no_argument, 0, 'v'},
-        {"config-file", required_argument, 0, 'c'}, {nullptr, 0, 0, 0}};
+    static struct option long_options[] = {
+        {"help", no_argument, 0, 1},
+        {"verbose", no_argument, 0, 'v'},
+        {"config-file", required_argument, 0, 'c'},
+        {nullptr, 0, 0, 0}
+    };
 #if defined(__GNUC__) || defined(__GNUG__)
 #pragma GCC diagnostic pop
 #endif
@@ -95,15 +99,11 @@ int main(int argc, char* argv[])
     //zstr_sendx (ms_server, "CONSUMER", FTY_PROTO_STREAM_METRICS, ".*", nullptr);
 
     // setup the storage age
-    for (int i = 0; i != STEPS_SIZE; i++) {
-        const char* dfl = DEFAULTS[i];
+    for (int i = 0; i < STEPS_SIZE; i++) {
+        char var_name[128];
+        snprintf(var_name, sizeof(var_name), "%s_%s", FTY_METRIC_STORE_CONF_PREFIX, STEPS[i]);
 
-        char* var_name = nullptr;
-        asprintf(&var_name, "%s_%s", FTY_METRIC_STORE_CONF_PREFIX, STEPS[i]);
-        if (var_name && getenv(var_name)) {
-            dfl = getenv(var_name);
-        }
-        zstr_free(&var_name);
+        const char* dfl = getenv(var_name) ? getenv(var_name) : DEFAULTS[i];
 
         zstr_sendx(ms_server, FTY_METRIC_STORE_CONF_PREFIX, STEPS[i], dfl, nullptr);
     }

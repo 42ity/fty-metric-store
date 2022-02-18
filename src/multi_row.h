@@ -27,55 +27,30 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <list>
 #include <string>
 
-#define MAX_ROW_DEFAULT   1000
-#define MAX_DELAY_DEFAULT 1
-
-#define EV_DBSTORE_MAX_ROW   "BIOS_DBSTORE_MAX_ROW"
-#define EV_DBSTORE_MAX_DELAY "BIOS_DBSTORE_MAX_DELAY"
+#define MAX_ROW_DEFAULT   10000
+#define MAX_DELAY_S_DEFAULT 60 //sec
 
 class MultiRowCache
 {
 public:
     MultiRowCache();
-    MultiRowCache(const uint32_t max_row, const uint32_t max_delay_s)
-    {
-        _max_row     = max_row;
-        _max_delay_s = max_delay_s;
-    }
 
     void push_back(int64_t time, m_msrmnt_value_t value, m_msrmnt_scale_t scale, m_msrmnt_tpc_id_t topic_id);
+    void clear();
 
-    /// check one of those conditions :
-    ///  number of values > _max_row
-    /// or delay between first value and now > _max_delay_s
-    bool is_ready_for_insert();
+    /// check one of those conditions:
+    /// - number of values > _max_row
+    /// - delay between first value and now > _max_delay_s
+    bool is_ready_for_insert() const;
 
-    std::string get_insert_query();
-
-    void clear()
-    {
-        _row_cache.clear();
-        reset_clock();
-    }
-    void reset_clock()
-    {
-        _first_ms = get_clock_ms();
-    }
-
-    uint32_t get_max_row()
-    {
-        return _max_row;
-    }
-    uint32_t get_max_delay()
-    {
-        return _max_delay_s;
-    }
+    void get_insert_query(std::string& query) const;
 
 private:
-    std::list<std::string> _row_cache;
-    uint32_t               _max_delay_s;
-    uint32_t               _max_row;
+    void reset_clock();
+    long get_clock_ms() const;
 
-    long get_clock_ms();
-    long _first_ms = get_clock_ms();
+    std::list<std::string> _row_cache;
+    uint32_t               _max_delay_s{MAX_DELAY_S_DEFAULT};
+    uint32_t               _max_row{MAX_ROW_DEFAULT};
+    long                   _first_ms{get_clock_ms()};
 };
