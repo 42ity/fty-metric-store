@@ -49,7 +49,7 @@
 
 #include "fty_metric_store_server.h"
 #include "actor_commands.h"
-#include "converter.h"
+#include "converter2.h"
 #include "multi_row.h"
 #include "persistance.h"
 #include <fty_log.h>
@@ -159,13 +159,13 @@ static zmsg_t* s_process_mailbox_aggregate(mlm_client_t* /*client*/, zmsg_t** me
             log_error("ordered is empty");
             SET_ERROR_MSG_AND_BREAK("BAD_MESSAGE");
         }
-        int64_t start_date = string_to_int64(start_date_str);
+        int64_t start_date = StringToInt64(start_date_str);
         if (errno != 0) {
             errno = 0;
             log_error("start date cannot be converted to number");
             SET_ERROR_MSG_AND_BREAK("BAD_MESSAGE");
         }
-        int64_t end_date = string_to_int64(end_date_str);
+        int64_t end_date = StringToInt64(end_date_str);
         if (errno != 0) {
             errno = 0;
             log_error("end date cannot be converted to number");
@@ -253,7 +253,7 @@ static zmsg_t* s_process_mailbox_aggregate(mlm_client_t* /*client*/, zmsg_t** me
                 r["scale"].get(scale);
                 r["timestamp"].get(timestamp);
 
-                double dblValue = value * std::pow(10, scale);
+                double dblValue = double(value) * std::pow(10, scale);
 
                 zmsg_addstr(msg_out, std::to_string(timestamp).c_str());
                 zmsg_addstr(msg_out, std::to_string(dblValue).c_str());
@@ -356,24 +356,21 @@ static void s_process_stream_proto_metric(fty_proto_t* m)
 
     std::string db_topic = std::string(fty_proto_type(m)) + "@" + std::string(fty_proto_name(m));
 
-    m_msrmnt_value_t value = 0;
-    m_msrmnt_scale_t scale = 0;
+    Number number;
     if (!strstr(fty_proto_value(m), ".")) {
-        value = m_msrmnt_value_t(string_to_int64(fty_proto_value(m)));
+        number.scale = 0;
+        number.value = StringToInt64(fty_proto_value(m));
         if (errno != 0) {
             errno = 0;
             log_error("value '%s' of the metric is not integer", fty_proto_value(m));
             return;
         }
     } else {
-        int8_t  lscale  = 0;
-        int32_t integer = 0;
-        if (!stobiosf_wrapper(fty_proto_value(m), integer, lscale)) {
+        int r = StringToNumber(fty_proto_value(m), number);
+        if (r != 0) {
             log_error("value '%s' of the metric is not double", fty_proto_value(m));
             return;
         }
-        value = integer;
-        scale = lscale;
     }
 
     // connect & test db
@@ -388,7 +385,7 @@ static void s_process_stream_proto_metric(fty_proto_t* m)
 
     // time is a time when message was received
     uint64_t _time = fty_proto_time(m);
-    insert_into_measurement(conn, db_topic.c_str(), value, scale, int64_t(_time), fty_proto_unit(m), fty_proto_name(m));
+    insert_into_measurement(conn, db_topic.c_str(), number.value, number.scale, int64_t(_time), fty_proto_unit(m), fty_proto_name(m));
 }
 
 static void s_process_stream_proto_asset(fty_proto_t* m)
@@ -468,24 +465,21 @@ static void s_process_pull_store_shm_metrics(fty::shm::shmMetrics& metrics)
 
         std::string db_topic = std::string(fty_proto_type(m)) + "@" + std::string(fty_proto_name(m));
 
-        m_msrmnt_value_t value = 0;
-        m_msrmnt_scale_t scale = 0;
+        Number number;
         if (!strstr(fty_proto_value(m), ".")) {
-            value = m_msrmnt_value_t(string_to_int64(fty_proto_value(m)));
+            number.scale = 0;
+            number.value = StringToInt64(fty_proto_value(m));
             if (errno != 0) {
                 errno = 0;
                 log_error("value '%s' of the metric '%s' is not integer", fty_proto_value(m), db_topic.c_str());
                 continue;
             }
         } else {
-            int8_t  lscale = 0;
-            int32_t lvalue = 0;
-            if (!stobiosf_wrapper(fty_proto_value(m), lvalue, lscale)) {
+            int r = StringToNumber(fty_proto_value(m), number);
+            if (r != 0) {
                 log_error("value '%s' of the metric '%s' is not double", fty_proto_value(m), db_topic.c_str());
                 continue;
             }
-            value = lvalue;
-            scale = lscale;
         }
 
         // connect & test db
@@ -505,8 +499,8 @@ static void s_process_pull_store_shm_metrics(fty::shm::shmMetrics& metrics)
         int r = insert_into_measurement(
             conn,
             db_topic.c_str(),
-            value,
-            scale,
+            number.value,
+            number.scale,
             int64_t(_time),
             fty_proto_unit(m),
             fty_proto_name(m)
