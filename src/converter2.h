@@ -45,10 +45,10 @@ void converterSetVerbose(bool verb);
 // converters
 //
 
-// Number converter
+// Number parser/converter
 // returns 0 if success (number is set), else <0
-int StringToNumber(const std::string& string, Number& number);
+int StringToNumber(const std::string& input, Number& number);
 
-// int64 converter
-// success if errno == 0, else failed
-int64_t StringToInt64(const std::string& string);
+// int64 parser/converter
+// success if errno == 0 (returns the value), else failed
+int64_t StringToInt64(const std::string& input);

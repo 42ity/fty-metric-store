@@ -155,9 +155,9 @@ static int DoubleToNumber(double value, Number& number)
     return 0; // ok
 }
 
-// Number converter
+// Number parser/converter
 // returns 0 if success (number is set), else <0
-int StringToNumber(const std::string& string, Number& number)
+int StringToNumber(const std::string& input, Number& number)
 {
     // parse double value from the input string
     double value;
@@ -165,8 +165,8 @@ int StringToNumber(const std::string& string, Number& number)
         std::string error; // empty
         try {
             std::size_t pos{0};
-            value = std::stod(string, &pos);
-            if (pos != string.size()) {
+            value = std::stod(input, &pos);
+            if (pos != input.size()) {
                 error = "parse is incomplete ";
             }
             else if (std::isnan(value)) {
@@ -187,14 +187,14 @@ int StringToNumber(const std::string& string, Number& number)
         }
 
         if (!error.empty()) {
-            logError("parse double value has failed ('" + string + "'), {}", error);
+            logError("parse double value has failed ('{}'), {}", input, error);
             number.clear();
             return -1;
         }
 
         if (verbose) {
             std::cout << "StringToNumber parse, "
-                << "string: '" << string << "'"
+                << "input: '" << input << "'"
                 << std::setprecision(std::numeric_limits<long double>::digits10 + 10)
                 << ", value: " << value << std::endl;
         }
@@ -204,19 +204,19 @@ int StringToNumber(const std::string& string, Number& number)
     return DoubleToNumber(value, number);
 }
 
-// int64 converter
+// int64 parser/converter
 // success if errno == 0, else failed
-int64_t StringToInt64(const std::string& string)
+int64_t StringToInt64(const std::string& input)
 {
     int64_t ret{0};
 
     errno = 0;
-    if (string.empty()) {
+    if (input.empty()) {
         errno = EINVAL;
     }
     else {
         char* end = NULL;
-        ret = strtoll(string.c_str(), &end, 10);
+        ret = strtoll(input.c_str(), &end, 10);
         if (*end) {
             errno = EINVAL;
         }
