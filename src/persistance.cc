@@ -29,26 +29,30 @@
 
 static MultiRowCache g_RowCache;
 
-int select_topic(const std::string& connurl, const std::string& topic, const std::function<void(const tntdb::Row&)>& cb)
+//
+int select_topic(
+    const std::string& connurl,
+    const std::string& topic,
+    const std::function<void(const tntdb::Row&)>& cb
+)
 {
     try {
-        tntdb::Connection conn = tntdb::connectCached(connurl);
-
-        tntdb::Statement st = conn.prepareCached(
+        std::string query =
             " SELECT "
-            "   * "
-            " FROM v_bios_measurement_topic "
+            "   id, units "
+            " FROM t_bios_measurement_topic "
             " WHERE "
-            "   topic = :topic ");
+            "   topic = :topic ";
 
+        tntdb::Connection conn = tntdb::connectCached(connurl);
+        tntdb::Statement st = conn.prepareCached(query);
         tntdb::Row row = st.set("topic", topic).selectRow();
 
         cb(row);
         return 0;
     } catch (const tntdb::NotFound& e) {
-        log_info("Topic '%s' not found.", topic.c_str());
-		//return -2;
-        return 0; // this is not an error (no data instead)
+        log_debug("Topic '%s' not found", topic.c_str());
+        return 0; // not an error
     } catch (const std::exception& e) {
         log_error("Exception caught: %s", e.what());
         return -1;
@@ -59,27 +63,32 @@ int select_topic(const std::string& connurl, const std::string& topic, const std
 }
 
 //
-int select_measurements(const std::string& connurl, const std::string& topic, int64_t start_timestamp,
-    int64_t end_timestamp, const std::function<void(const tntdb::Row&)>& cb, bool is_ordered)
+int select_measurements(
+    const std::string& connurl,
+    m_msrmnt_tpc_id_t topic_id,
+    int64_t start_timestamp,
+    int64_t end_timestamp,
+    bool ordered,
+    const std::function<void(const tntdb::Row&)>& cb
+)
 {
     try {
-        tntdb::Connection conn = tntdb::connectCached(connurl);
-        std::string       query =
+        std::string query =
             " SELECT "
-            "   topic, value, scale, timestamp, units "
-            " FROM v_bios_measurement "
+            "   value, scale, timestamp "
+            " FROM t_bios_measurement "
             " WHERE "
-            "   topic = :topic AND "
+            "   topic_id = :topic_id AND "
             "   timestamp >= :time_st AND "
             "   timestamp <= :time_end ";
-        if (is_ordered) {
+        if (ordered) {
             query += " ORDER BY timestamp ASC";
         }
+
+        tntdb::Connection conn = tntdb::connectCached(connurl);
         tntdb::Statement st = conn.prepareCached(query);
-        // ACE: I know, that topic_id would have better performance, but
-        // for first iteration lets stay with this approach
         tntdb::Result result =
-            st.set("topic", topic).set("time_st", start_timestamp).set("time_end", end_timestamp).select();
+            st.set("topic_id", topic_id).set("time_st", start_timestamp).set("time_end", end_timestamp).select();
 
         for (const auto& row : result) {
             cb(row);
@@ -94,12 +103,16 @@ int select_measurements(const std::string& connurl, const std::string& topic, in
     }
 }
 
-m_dvc_id_t insert_as_not_classified_device(tntdb::Connection& conn, const char* device_name)
+m_dvc_id_t insert_as_not_classified_device(
+    tntdb::Connection& conn,
+    const char* device_name
+)
 {
     if (device_name == NULL || device_name[0] == 0) {
         log_error("[t_bios_discovered_device] can't insert a device with NULL or non device name");
         return 0;
     }
+
     m_dvc_id_t       id_discovered_device = 0;
     tntdb::Statement st;
     st = conn.prepareCached(
@@ -138,12 +151,15 @@ m_dvc_id_t insert_as_not_classified_device(tntdb::Connection& conn, const char* 
 }
 
 // return id_discovered_device or 0 in case of issue
-m_dvc_id_t prepare_discovered_device(tntdb::Connection& conn, const char* device_name)
+m_dvc_id_t prepare_discovered_device(
+    tntdb::Connection& conn,
+    const char* device_name
+)
 {
     assert(device_name);
 
     // verify if the device name exists in t_bios_discovered_device
-    // if not create it as not_classified device type
+    // if not, create it as not_classified device type
     tntdb::Statement st = conn.prepareCached(
         " SELECT id_discovered_device "
         " FROM "
@@ -151,6 +167,7 @@ m_dvc_id_t prepare_discovered_device(tntdb::Connection& conn, const char* device
         " WHERE "
         "   v.name = :name");
     st.set("name", device_name);
+
     try {
         m_dvc_id_t id_discovered_device = 0;
         tntdb::Row row                  = st.selectRow();
@@ -167,8 +184,13 @@ m_dvc_id_t prepare_discovered_device(tntdb::Connection& conn, const char* device
     }
 }
 
-// return topic_id or 0 in case of issue
-m_msrmnt_tpc_id_t prepare_topic(tntdb::Connection& conn, const char* topic, const char* units, const char* device_name)
+// return topic_id (>0) or 0 in case of issue
+m_msrmnt_tpc_id_t prepare_topic(
+    tntdb::Connection& conn,
+    const char* topic,
+    const char* units,
+    const char* device_name
+)
 {
     assert(topic);
     assert(units);
@@ -189,13 +211,17 @@ m_msrmnt_tpc_id_t prepare_topic(tntdb::Connection& conn, const char* topic, cons
             "   UPDATE "
             "      id = LAST_INSERT_ID(id) ");
 
-        uint32_t n = st.set("topic", topic).set("units", units).set("device_id", id_discovered_device).execute();
+        st.set("topic", topic).set("units", units).set("device_id", id_discovered_device).execute();
+
+        //if (conn.lastInsertId() != m_msrmnt_tpc_id_t(conn.lastInsertId())) {
+        //    logError("conn.lastInsertId(): {} neq. {}", conn.lastInsertId(), m_msrmnt_tpc_id_t(conn.lastInsertId()));
+        //}
 
         m_msrmnt_tpc_id_t topic_id = m_msrmnt_tpc_id_t(conn.lastInsertId());
         if (topic_id != 0) {
-            log_debug("[t_bios_measurement_topic]: inserted topic %s, #%d rows , topic_id %u", topic, n, topic_id);
+            //log_trace("inserted topic %s, topic_id %u", topic, topic_id);
         } else {
-            log_error("[t_bios_measurement_topic]:  topic %s not inserted", topic);
+            log_error("topic '%s' not inserted", topic);
         }
         return topic_id;
     } catch (const std::exception& e) {
@@ -205,26 +231,33 @@ m_msrmnt_tpc_id_t prepare_topic(tntdb::Connection& conn, const char* topic, cons
 }
 
 //
-void flush_measurement(tntdb::Connection& conn)
+static void flush_measurement(tntdb::Connection& conn)
 {
-    log_debug("Performing periodic flush");
+    log_trace("Performing periodic flush");
     try {
-        std::string query = g_RowCache.get_insert_query();
-        if (query.length() == 0) {
-            g_RowCache.reset_clock();
-            return;
+        std::string query;
+        g_RowCache.get_insert_query(query);
+        if (!query.empty()) {
+            tntdb::Statement st            = conn.prepare(query.c_str());
+            uint32_t         affected_rows = st.execute();
+            log_debug("flush measurements from cache, inserted %d rows ", affected_rows);
         }
-        tntdb::Statement st            = conn.prepare(query.c_str());
-        uint32_t         affected_rows = st.execute();
-        log_debug("[t_bios_measurement]: flush measurements from cache, inserted %d rows ", affected_rows);
         g_RowCache.clear();
     } catch (const std::exception& e) {
-        log_error("Abnormal flush termination");
+        log_error("unexpected flush termination (e: %s)", e.what());
+    }
+}
+
+// Do a flush only if cache is full or enough time elapsed since the last flush
+static void flush_measurement_when_needed(tntdb::Connection& conn)
+{
+    if (g_RowCache.is_ready_for_insert()) {
+        flush_measurement(conn);
     }
 }
 
 //
-void flush_measurement(std::string& url)
+void flush_measurement(const std::string& url)
 {
     tntdb::Connection conn;
     try {
@@ -237,24 +270,24 @@ void flush_measurement(std::string& url)
     flush_measurement(conn);
 }
 
-// Do a flush only if cache is full or enough time elapsed since the last flush
-void flush_measurement_when_needed(tntdb::Connection& conn)
-{
-    if (g_RowCache.is_ready_for_insert()) {
-        flush_measurement(conn);
-    }
-}
-
-void flush_measurement_when_needed(std::string& url)
+//
+void flush_measurement_when_needed(const std::string& url)
 {
     if (g_RowCache.is_ready_for_insert()) {
         flush_measurement(url);
     }
 }
 
-//
-int insert_into_measurement(tntdb::Connection& conn, const char* topic, m_msrmnt_value_t value, m_msrmnt_scale_t scale,
-    int64_t time, const char* units, const char* device_name)
+// returns 0 if success, else <0
+int insert_into_measurement(
+    tntdb::Connection& conn,
+    const char* topic,
+    m_msrmnt_value_t value,
+    m_msrmnt_scale_t scale,
+    int64_t time,
+    const char* units,
+    const char* device_name
+)
 {
     assert(units);
     assert(device_name);
@@ -262,25 +295,29 @@ int insert_into_measurement(tntdb::Connection& conn, const char* topic, m_msrmnt
 
     if (topic[0] == '@') {
         log_error("malformed value of topic '%s' is not allowed", topic);
-        return 1;
+        return -1;
     }
 
     try {
         m_msrmnt_tpc_id_t topic_id = prepare_topic(conn, topic, units, device_name);
         if (topic_id == 0) {
             log_error("topic '%s' was not inserted -> cannot insert metric", topic);
-            return 1;
+            return -1;
         }
         g_RowCache.push_back(time, value, scale, topic_id);
         flush_measurement_when_needed(conn);
         return 0;
     } catch (const std::exception& e) {
         log_error("Metric with topic '%s' was not inserted with error: %s", topic, e.what());
-        return 1;
+        return -1;
     }
 }
 
-int delete_measurements(tntdb::Connection& conn, const char* asset_name)
+// returns 0 if success, else <0
+int delete_measurements(
+    tntdb::Connection& conn,
+    const char* asset_name
+)
 {
     assert(asset_name);
 
@@ -294,10 +331,10 @@ int delete_measurements(tntdb::Connection& conn, const char* asset_name)
             "   m.topic_id = mt.id AND "
             "   mt.topic like :name ");
         auto r = st.set("name", "%@" + std::string(asset_name)).execute();
-        log_info("deleted: %d", r);
+        log_info("%s deleted: %d", asset_name, r);
         return 0;
     } catch (const std::exception& e) {
-        log_error("Cannot delete measurements and topics: '%s'", e.what());
-        return 1;
+        log_error("Cannot delete '%s' measurements and topics (e: %s)", asset_name, e.what());
+        return -1;
     }
 }

@@ -3,7 +3,7 @@ cmake_policy(VERSION 3.13)
 
 project(fty-metric-store
     VERSION 1.0.0
-    DESCRIPTION "Persistance for metrics"
+    DESCRIPTION "Persistency of aggregated metrics"
 )
 
 ##############################################################################################################
@@ -14,8 +14,8 @@ etn_target(static ${PROJECT_NAME}-lib
     SOURCES
         src/actor_commands.cc
         src/actor_commands.h
-        src/converter.cc
-        src/converter.h
+        src/converter2.cc
+        src/converter2.h
         #src/dbstore_bench.cc
         src/fty_metric_store_server.cc
         src/fty_metric_store_server.h
@@ -48,7 +48,7 @@ etn_target(exe ${PROJECT_NAME}
 etn_test_target(${PROJECT_NAME}-lib
     SOURCES
         tests/actor_commands.cpp
-        tests/converter.cpp
+        tests/converter2.cpp
         tests/main.cpp
         tests/metric_store_server.cpp
     PREPROCESSOR

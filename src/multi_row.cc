@@ -30,10 +30,13 @@
 #include <inttypes.h>
 #include <sys/time.h>
 
+#define EV_DBSTORE_MAX_ROW   "BIOS_DBSTORE_MAX_ROW"
+#define EV_DBSTORE_MAX_DELAY "BIOS_DBSTORE_MAX_DELAY"
+
 MultiRowCache::MultiRowCache()
 {
     _max_row     = MAX_ROW_DEFAULT;
-    _max_delay_s = MAX_DELAY_DEFAULT;
+    _max_delay_s = MAX_DELAY_S_DEFAULT;
 
     char* env_max_row = getenv(EV_DBSTORE_MAX_ROW);
     if (env_max_row) {
@@ -52,58 +55,76 @@ MultiRowCache::MultiRowCache()
     }
 }
 
-void MultiRowCache::push_back(int64_t time, m_msrmnt_value_t value, m_msrmnt_scale_t scale, m_msrmnt_tpc_id_t topic_id)
+void MultiRowCache::clear()
 {
-    // multiple row insertion request
-    char val[50];
-    snprintf(val, sizeof(val), "(%" PRIu64 ",%" PRIi32 ",%" PRIi16 ",%" PRIi16 ")", time, value, scale, topic_id);
-    _row_cache.push_back(val);
-    // check if it is the first one => if yes, memory the timestamp
-    if (_row_cache.size() == 1) {
-        _first_ms = get_clock_ms();
-    }
+    _row_cache.clear();
+    reset_clock();
 }
 
-bool MultiRowCache::is_ready_for_insert()
-{
-    if (_row_cache.size() == 0)
-        return false;
-
-    // max cache size limit reached ?
-    if (_row_cache.size() >= _max_row)
-        return true;
-
-    // time to flush measurement ?
-    long now_ms              = get_clock_ms();
-    long elapsed_periodic_ms = now_ms - _first_ms;
-    if (elapsed_periodic_ms >= (long(_max_delay_s) * 1000))
-        return true;
-
-    return false;
-    // return (_row_cache.size()>=_max_row || elapsed_periodic_ms >= (long)_max_delay_s * 1000 );
-}
-
-// return INSERT query or empty string if no value in cache available
-std::string MultiRowCache::get_insert_query()
-{
-    if (_row_cache.size() == 0)
-        return "";
-
-    std::string query = "INSERT INTO t_bios_measurement (timestamp, value, scale, topic_id) VALUES ";
-    for (std::list<std::string>::iterator value = _row_cache.begin(); value != _row_cache.end();) {
-        query += *value;
-        if (++value != _row_cache.end())
-            query += ",";
-    }
-    query += " ON DUPLICATE KEY UPDATE value=VALUES(value),scale=VALUES(scale) ";
-
-    log_debug("query %s", query.c_str());
-    return query;
-}
-
-long MultiRowCache::get_clock_ms()
+long MultiRowCache::get_clock_ms() const
 {
     struct timeval time;
     gettimeofday(&time, nullptr); // Get Time
     return (time.tv_sec * 1000) + (time.tv_usec / 1000);
+}
+
+void MultiRowCache::reset_clock()
+{
+    _first_ms = get_clock_ms();
+}
+
+bool MultiRowCache::is_ready_for_insert() const
+{
+    if (_row_cache.size() != 0) {
+        // max cache size limit reached ?
+        if (_row_cache.size() >= _max_row) {
+            log_trace("=== is_ready_for_insert: max_row");
+            return true;
+        }
+
+        // delayed time to flush ?
+        long now_ms              = get_clock_ms();
+        long elapsed_periodic_ms = now_ms - _first_ms;
+        if (elapsed_periodic_ms >= (long(_max_delay_s) * 1000)) {
+            log_trace("=== is_ready_for_insert: max_delay");
+            return true;
+        }
+    }
+    return false;
+}
+
+void MultiRowCache::push_back(int64_t time, m_msrmnt_value_t value, m_msrmnt_scale_t scale, m_msrmnt_tpc_id_t topic_id)
+{
+    // check if it is the first one => if yes, reset the timestamp
+    if (_row_cache.size() == 0) {
+        reset_clock();
+    }
+
+    // multiple row insertion request, in *order* (see get_insert_query())
+    char val[64];
+    snprintf(val, sizeof(val), "(%" PRIu64 ",%" PRIi64 ",%" PRIi16 ",%" PRIi32 ")", time, value, scale, topic_id);
+    _row_cache.push_back(val);
+}
+
+// return INSERT query or empty string if no value in cache available
+void MultiRowCache::get_insert_query(std::string& query) const
+{
+    query.clear();
+
+    if (_row_cache.size() == 0)
+        return;
+
+    std::string values;
+    values.reserve(_row_cache.size() * 32);
+    for (auto& value : _row_cache) {
+        values.append((values.empty() ? "" : ",") + value);
+    }
+
+    query.reserve(values.size() + 200);
+    query.append("INSERT INTO t_bios_measurement (timestamp, value, scale, topic_id) VALUES ");
+    query.append(values);
+    query.append(" ON DUPLICATE KEY UPDATE value=VALUES(value),scale=VALUES(scale) ");
+
+    //log_debug("insert query, %s", query.c_str());
+    log_trace("insert query, cache size: %zu", _row_cache.size());
 }

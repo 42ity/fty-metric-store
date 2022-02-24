@@ -1,7 +1,4 @@
 /*  =========================================================================
-    converter - Some helper functions to convert between types
-    Note: This file was manually amended, see below
-
     Copyright (C) 2014 - 2020 Eaton
 
     This program is free software; you can redistribute it and/or modify
@@ -21,12 +18,37 @@
 */
 
 #pragma once
+#include <inttypes.h>
 #include <string>
 
-/**
- *  \brief Take string encoded double value and if possible
- *          return representation: integer x 10^scale
- */
-bool stobiosf(const std::string& string, int32_t& integer, int8_t& scale);
-int64_t string_to_int64(const char* value);
-bool stobiosf_wrapper(const std::string& string, int32_t& integer, int8_t& scale);
+// Number representation (integer), as value * 10^scale
+struct Number {
+    Number() = default;
+    Number(int64_t value_, int16_t scale_)
+        : value(value_)
+        , scale(scale_)
+    {}
+
+    int64_t value{0};
+    int16_t scale{0};
+
+    void clear();
+    double getValue() const;
+    bool eq(const Number& n) const;
+    void dump(const std::string& prefix = "") const; //dbg
+};
+
+// enable verbosity (dbg, test)
+void converterSetVerbose(bool verb);
+
+//
+// converters
+//
+
+// Number parser/converter
+// returns 0 if success (number is set), else <0
+int StringToNumber(const std::string& input, Number& number);
+
+// int64 parser/converter
+// success if errno == 0 (returns the value), else failed
+int64_t StringToInt64(const std::string& input);
