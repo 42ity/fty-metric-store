@@ -96,7 +96,13 @@ static zmsg_t* s_process_mailbox_aggregate(mlm_client_t* /*client*/, zmsg_t** me
 
     char* cmd = zmsg_popstr(msg);
     if (!cmd || (!streq(cmd, "GET") && !streq(cmd, "GET_TEST"))) {
-        log_error("GET command is missing (cmd: %s)", cmd);
+        if (!cmd) {
+            log_error("GET command is missing");
+        }
+        else {
+            log_error("GET command is missing (cmd: %s)", cmd);
+            zstr_free(&cmd);
+        }
         zmsg_destroy(message_p);
         zmsg_addstr(msg_out, "ERROR");
         zmsg_addstr(msg_out, "BAD_MESSAGE");
