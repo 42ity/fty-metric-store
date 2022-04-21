@@ -251,15 +251,13 @@ static zmsg_t* s_process_mailbox_aggregate(mlm_client_t* /*client*/, zmsg_t** me
 
             std::function<void(const tntdb::Row&)> add_measurement([msg_out](const tntdb::Row& r)
             {
-                m_msrmnt_value_t value = 0;
-                m_msrmnt_scale_t scale = 0;
-                int64_t timestamp = 0;
-
-                r["value"].get(value);
-                r["scale"].get(scale);
-                r["timestamp"].get(timestamp);
+                int64_t value = r["value"].getInt64();
+                int32_t scale = r["scale"].getInt32();
+                int64_t timestamp = r["timestamp"].getInt64();
 
                 double dblValue = double(value) * std::pow(10, scale);
+
+                //logDebug("==== value: {}, scale: {}, dblValue {}", value, scale, dblValue);
 
                 zmsg_addstr(msg_out, std::to_string(timestamp).c_str());
                 zmsg_addstr(msg_out, std::to_string(dblValue).c_str());
