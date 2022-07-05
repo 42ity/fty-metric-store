@@ -99,7 +99,8 @@ int main(int argc, char* argv[])
     //zstr_sendx (ms_server, "CONSUMER", FTY_PROTO_STREAM_METRICS, ".*", nullptr);
 
     // setup the storage age
-    for (int i = 0; i < STEPS_SIZE; i++) {
+    
+    for (int i = STEPS_SIZE ; i > 0; i--) {
         char var_name[128];
         snprintf(var_name, sizeof(var_name), "%s_%s", FTY_METRIC_STORE_CONF_PREFIX, STEPS[i]);
 
