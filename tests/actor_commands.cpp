@@ -34,7 +34,7 @@ TEST_CASE("actor commands test")
     // since this test suite checks stderr, log on WARNING level
     ManageFtyLog::getInstanceFtylog()->setLogLevelWarning();
 
-    static const char* endpoint = "ipc://ms-test-actor-commands";
+    static const char* endpoint = "inproc://ms-test-actor-commands";
 
     // malamute broker
     zactor_t* malamute = zactor_new(mlm_server, const_cast<char*>("Malamute"));
