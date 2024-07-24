@@ -94,9 +94,7 @@ int main(int argc, char* argv[])
     }
 
     zstr_sendx(ms_server, "CONNECT", ENDPOINT, AGENT_NAME, nullptr);
-
     zstr_sendx(ms_server, "CONSUMER", FTY_PROTO_STREAM_ASSETS, ".*", nullptr);
-    //zstr_sendx (ms_server, "CONSUMER", FTY_PROTO_STREAM_METRICS, ".*", nullptr);
 
     // setup the storage age
     for (int i = 0; i < STEPS_SIZE; i++) {
