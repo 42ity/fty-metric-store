@@ -21,11 +21,13 @@ with this program; if not, write to the Free Software Foundation, Inc.,
     \brief  manage multi rows insertion cache
     \author GeraldGuillaume <GeraldGuillaume@Eaton.com>
  */
+
 #pragma once
 
 #include "persistance.h"
 #include <list>
 #include <string>
+#include <cstdint>
 
 #define MAX_ROW_DEFAULT   10000
 #define MAX_DELAY_S_DEFAULT 60 //sec

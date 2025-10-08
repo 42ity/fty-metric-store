@@ -21,8 +21,10 @@
 */
 
 #pragma once
+
 #include <functional>
 #include <string>
+#include <cstdint>
 
 namespace tntdb {
 class Connection;

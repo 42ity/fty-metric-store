@@ -160,7 +160,7 @@ static int DoubleToNumber(double value, Number& number)
 int StringToNumber(const std::string& input, Number& number)
 {
     // parse double value from the input string
-    double value;
+    double value = 0.0;
     {
         std::string error; // empty
         try {
